@@ -3,8 +3,12 @@ import { ChevronRight, MessageSquare, Rocket } from 'lucide-react';
 import {
   COMMUNITY_IDEAS,
   CRYPTO_ASSETS,
+  CRYPTO_NEWS,
   FEATURED_IPOS,
+  FOREX_NEWS,
+  FUTURES_NEWS,
   INDICATOR_SCRIPTS,
+  INDIAN_STOCKS_NEWS,
   MACRO_SPARK_ROWS,
   MAJOR_INDICES,
   TOP_STORIES,
@@ -37,6 +41,17 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
   const featuredAsset = useMemo(() => {
     return MAJOR_INDICES.find((m) => m.symbol === featuredSymbol) || MAJOR_INDICES[0];
   }, [featuredSymbol]);
+
+  const aggregatedNews = useMemo(
+    () => [
+      ...TOP_STORIES,
+      ...INDIAN_STOCKS_NEWS,
+      ...CRYPTO_NEWS,
+      ...FOREX_NEWS,
+      ...FUTURES_NEWS,
+    ],
+    []
+  );
 
   const inflationBars = [
     { label: 'Jan', val: 4.1 },
@@ -174,8 +189,14 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
             </div>
           </div>
 
-          {/* Real-Time Fear & Greed Market Sentiment Gauge */}
-          <FearGreedGauge />
+          {/* Real-Time News Volume & Price Trend Market Sentiment Gauge */}
+          <FearGreedGauge
+            newsItems={aggregatedNews}
+            onSelectHeadline={(storyId) => {
+              const matched = aggregatedNews.find((n) => n.id === storyId);
+              if (matched) onSelectNews(matched);
+            }}
+          />
 
           {/* 2-Column Paired Grid: Major Indices & Crypto Market Cap (PDF Page 3) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
