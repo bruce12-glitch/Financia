@@ -88,7 +88,7 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
           <div className="max-w-2xl">
             <div className="text-xs font-mono text-[#60A5FA] mb-3">
-              01. Institutional Research Architecture
+              02. Institutional Research Architecture
             </div>
             <h2
               className="font-display font-bold text-white tracking-[-0.025em]"

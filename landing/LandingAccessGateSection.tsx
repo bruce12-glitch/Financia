@@ -29,7 +29,7 @@ export const LandingAccessGateSection: React.FC<LandingAccessGateSectionProps> =
             <span>
               {currentUser
                 ? 'Authenticated Workspace Ready'
-                : '02. Full Terminal & 3D World'}
+                : '03. Full Terminal & 3D World'}
             </span>
           </div>
 
