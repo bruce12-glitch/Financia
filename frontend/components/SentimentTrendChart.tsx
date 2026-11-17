@@ -11,6 +11,7 @@ interface SentimentTrendChartProps {
   history90d: SentimentHistoryPoint[];
   activeColor: string;
   scopeTitle: string;
+  theme?: 'light' | 'dark';
 }
 
 const TIMEFRAME_OPTIONS: Array<{ id: SentimentTimeframe; label: string; ariaLabel: string }> = [
@@ -27,7 +28,9 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
   history90d,
   activeColor,
   scopeTitle,
+  theme = 'light',
 }) => {
+  const isDark = theme === 'dark';
   const [timeframe, setTimeframe] = useState<SentimentTimeframe>('30d');
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const gradientId = useId().replace(/:/g, '');
@@ -115,15 +118,19 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
       data-testid="sentiment-d3-chart"
       data-timeframe={timeframe}
       data-points={points.length}
-      className="py-4 border-b border-[#F0F3FA]"
+      className={`py-4 border-b ${isDark ? 'border-[#1A202C]' : 'border-[#F0F3FA]'}`}
     >
       {/* Top Header & 7D / 30D / 90D Toggle */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
-          <div className="text-xs font-semibold text-[#131722]">
+          <div className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-[#131722]'}`}>
             Historical sentiment trend
           </div>
-          <div className="text-[11px] text-[#787B86] font-mono tabular-nums mt-0.5 flex flex-wrap items-center gap-1.5">
+          <div
+            className={`text-[11px] font-mono tabular-nums mt-0.5 flex flex-wrap items-center gap-1.5 ${
+              isDark ? 'text-[#9598A1]' : 'text-[#787B86]'
+            }`}
+          >
             <span>Low {chartModel.minScore}</span>
             <span aria-hidden="true">·</span>
             <span>Avg {chartModel.avgScore}</span>
@@ -132,7 +139,7 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
             {inspectedPoint && inspectedZone && (
               <>
                 <span aria-hidden="true">·</span>
-                <span className="font-semibold text-[#131722]">
+                <span className={`font-semibold ${isDark ? 'text-white' : 'text-[#131722]'}`}>
                   {inspectedPoint.label}: {inspectedPoint.score}{' '}
                   <span style={{ color: inspectedZone.color }}>({inspectedZone.zone})</span>
                 </span>
@@ -144,7 +151,9 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
         <div
           role="group"
           aria-label="Sentiment trend timeframe"
-          className="inline-flex items-center p-0.5 rounded-lg bg-[#F0F3FA] gap-0.5 shrink-0"
+          className={`inline-flex items-center p-0.5 rounded-lg gap-0.5 shrink-0 ${
+            isDark ? 'bg-[#06090F] border border-[#1A202C]' : 'bg-[#F0F3FA]'
+          }`}
         >
           {TIMEFRAME_OPTIONS.map((opt) => (
             <button
@@ -158,8 +167,12 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
               }}
               className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 timeframe === opt.id
-                  ? 'bg-[#131722] text-white'
-                  : 'text-[#434651] hover:text-[#131722]'
+                  ? isDark
+                    ? 'bg-[#2962FF] text-white'
+                    : 'bg-[#131722] text-white'
+                  : isDark
+                    ? 'text-[#9598A1] hover:text-white'
+                    : 'text-[#434651] hover:text-[#131722]'
               }`}
             >
               {opt.label}
@@ -179,7 +192,7 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={activeColor} stopOpacity="0.22" />
+            <stop offset="0%" stopColor={activeColor} stopOpacity={isDark ? '0.28' : '0.22'} />
             <stop offset="100%" stopColor={activeColor} stopOpacity="0.01" />
           </linearGradient>
         </defs>
@@ -188,6 +201,13 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
         {[0, 25, 50, 75, 100].map((tickVal) => {
           const yPos = chartModel.yScale(tickVal);
           const isThreshold = tickVal === 25 || tickVal === 50 || tickVal === 75;
+          const gridStroke = isDark
+            ? isThreshold
+              ? '#242B3B'
+              : '#161B26'
+            : isThreshold
+              ? '#E0E3EB'
+              : '#F0F3FA';
           return (
             <g key={tickVal}>
               <line
@@ -195,7 +215,7 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
                 x2={SVG_WIDTH - MARGIN.right}
                 y1={yPos}
                 y2={yPos}
-                stroke={isThreshold ? '#E0E3EB' : '#F0F3FA'}
+                stroke={gridStroke}
                 strokeDasharray={isThreshold ? '3 3' : undefined}
                 strokeWidth="1"
               />
@@ -204,7 +224,7 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
                 y={yPos}
                 textAnchor="end"
                 dominantBaseline="middle"
-                fill="#787B86"
+                fill={isDark ? '#8B92A5' : '#787B86'}
                 fontSize="10"
                 fontFamily="var(--font-mono)"
               >
@@ -244,7 +264,7 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
               x={xPos}
               y={SVG_HEIGHT - 6}
               textAnchor={anchor}
-              fill="#787B86"
+              fill={isDark ? '#8B92A5' : '#787B86'}
               fontSize="10"
               fontFamily="var(--font-mono)"
             >
@@ -261,7 +281,7 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
               x2={chartModel.xScale(activeIdx)}
               y1={MARGIN.top}
               y2={SVG_HEIGHT - MARGIN.bottom}
-              stroke="#94A3B8"
+              stroke={isDark ? '#475569' : '#94A3B8'}
               strokeWidth="1"
               strokeDasharray="2 2"
             />
@@ -270,7 +290,7 @@ export const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
               cy={chartModel.yScale(inspectedPoint.score)}
               r="4.5"
               fill={inspectedZone?.color || activeColor}
-              stroke="#FFFFFF"
+              stroke={isDark ? '#0B0F17' : '#FFFFFF'}
               strokeWidth="2"
             />
           </g>
