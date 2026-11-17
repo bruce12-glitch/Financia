@@ -3,13 +3,22 @@ import assert from 'node:assert/strict';
 import {
   buildDeterministicHistory90d,
   clampSentimentScore,
+  classifyHeadlineSentiment,
   computeCompositeMarketSentiment,
+  computeNewsVolumeSignals,
   getSentimentHistoryWindow,
   getSentimentZone,
   parseAlternativeMeFng,
   scoreToNeedleAngle,
 } from './sentimentEngine';
-import { CRYPTO_ASSETS, MACRO_SPARK_ROWS, MAJOR_INDICES } from '../data/tradingViewData';
+import {
+  CRYPTO_ASSETS,
+  CRYPTO_NEWS,
+  INDIAN_STOCKS_NEWS,
+  MACRO_SPARK_ROWS,
+  MAJOR_INDICES,
+  TOP_STORIES,
+} from '../data/tradingViewData';
 
 test('getSentimentZone maps exact boundaries across all five market regimes', () => {
   assert.equal(getSentimentZone(0).zone, 'Extreme Fear');
@@ -72,7 +81,23 @@ test('buildDeterministicHistory90d and getSentimentHistoryWindow slice 7d, 30d, 
   assert.equal(getSentimentHistoryWindow(series90, '90d').length, 90);
 });
 
-test('computeCompositeMarketSentiment returns valid bounded scopes and reflects live overrides', () => {
+test('classifyHeadlineSentiment and computeNewsVolumeSignals score news velocity and tone accurately', () => {
+  assert.equal(classifyHeadlineSentiment('Nvidia shares surge to record high after earnings beat'), 'bullish');
+  assert.equal(classifyHeadlineSentiment('Bitcoin sinks to fresh low amid heavy liquidation dump'), 'bearish');
+  assert.equal(classifyHeadlineSentiment('Central bank releases quarterly policy schedule'), 'neutral');
+
+  const newsSignals = computeNewsVolumeSignals(
+    [...TOP_STORIES, ...CRYPTO_NEWS, ...INDIAN_STOCKS_NEWS],
+    'global'
+  );
+  assert.ok(newsSignals.totalArticles >= 10);
+  assert.ok(newsSignals.velocityScore >= 0 && newsSignals.velocityScore <= 100);
+  assert.ok(newsSignals.toneScore >= 0 && newsSignals.toneScore <= 100);
+  assert.ok(newsSignals.combinedNewsScore >= 0 && newsSignals.combinedNewsScore <= 100);
+  assert.ok(newsSignals.topHeadlines.length > 0 && newsSignals.topHeadlines.length <= 4);
+});
+
+test('computeCompositeMarketSentiment integrates wire news volume and price trends cleanly', () => {
   const sample90 = buildDeterministicHistory90d({
     endScore: 71,
     previousClose: 68,
@@ -86,6 +111,7 @@ test('computeCompositeMarketSentiment returns valid bounded scopes and reflects 
     indices: MAJOR_INDICES,
     crypto: CRYPTO_ASSETS,
     macro: MACRO_SPARK_ROWS,
+    news: [...TOP_STORIES, ...CRYPTO_NEWS, ...INDIAN_STOCKS_NEWS],
     liveCryptoFng: {
       currentScore: 71,
       previousClose: 68,
@@ -106,9 +132,11 @@ test('computeCompositeMarketSentiment returns valid bounded scopes and reflects 
   assert.equal(payload.scopes.crypto.deltaFromClose, 3);
   assert.equal(payload.scopes.crypto.sourceLabel, 'Alternative.me Live F&G');
   assert.equal(payload.scopes.crypto.history90d.length, 90);
+  assert.ok(payload.scopes.global.newsSignals.totalArticles >= 10);
 
   for (const scope of Object.values(payload.scopes)) {
     assert.ok(scope.score >= 0 && scope.score <= 100);
+    assert.ok(scope.priceTrendScore >= 0 && scope.priceTrendScore <= 100);
     assert.equal(scope.drivers.length, 4);
     assert.equal(scope.history90d.length, 90);
     for (const driver of scope.drivers) {
