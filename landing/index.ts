@@ -1,7 +1,10 @@
 export { EarthHeroSection } from './EarthHeroSection';
 export { HeroTickerMarquee } from './HeroTickerMarquee';
 export { SuperchartsSection } from './SuperchartsSection';
+export { LandingCapabilitiesSection } from './LandingCapabilitiesSection';
+export { LandingAccessGateSection } from './LandingAccessGateSection';
 export { RocketFooterSection } from './RocketFooterSection';
 export { AuthPageModal } from './AuthPageModal';
 export { AlpineAuthCanvas } from './AlpineAuthCanvas';
+export { MeadowGrass3D } from './MeadowGrass3D';
 export { FinanciaLogo } from './FinanciaLogo';

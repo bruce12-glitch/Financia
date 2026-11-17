@@ -1,17 +1,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Layers, Monitor, SlidersHorizontal } from 'lucide-react';
+import {
+  Activity,
+  ArrowUpRight,
+  ChevronRight,
+  Layers,
+  Monitor,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { SUPERCHART_INSTRUMENTS } from '../frontend/data/tradingViewData';
 import { SuperchartCandle, SuperchartInstrument } from '../frontend/types/markets';
+import {
+  adaptCandlesForTimeframe,
+  computeCandleEma,
+  SuperchartTimeframe,
+} from './landingCapabilitiesData';
 
 interface SuperchartsSectionProps {
   onSelectSymbol?: (symbol: string) => void;
+  onOpenTerminal?: (symbol: string) => void;
 }
 
-export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelectSymbol }) => {
+export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({
+  onSelectSymbol,
+  onOpenTerminal,
+}) => {
   const [activeSymbol, setActiveSymbol] = useState<string>('AAPL');
-  const [timeframe, setTimeframe] = useState<'15m' | '1h' | '4h' | '1D'>('1h');
+  const [timeframe, setTimeframe] = useState<SuperchartTimeframe>('1h');
   const [showVolumeProfile, setShowVolumeProfile] = useState<boolean>(true);
   const [showFibLevels, setShowFibLevels] = useState<boolean>(true);
+  const [showEmaLine, setShowEmaLine] = useState<boolean>(true);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [featuresExpanded, setFeaturesExpanded] = useState<boolean>(false);
   const [liveBtcCandles, setLiveBtcCandles] = useState<SuperchartCandle[] | null>(null);
   const [liveBtcPrice, setLiveBtcPrice] = useState<number | null>(null);
@@ -24,7 +42,9 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
     let cancelled = false;
     const binanceInterval = timeframe === '1D' ? '1d' : timeframe;
 
-    fetch(`/api/crypto/klines?symbol=BTCUSDT&interval=${encodeURIComponent(binanceInterval)}&limit=14`)
+    fetch(
+      `/api/crypto/klines?symbol=BTCUSDT&interval=${encodeURIComponent(binanceInterval)}&limit=14`
+    )
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { source?: string; candles?: SuperchartCandle[] } | null) => {
         if (cancelled || !data?.candles || data.candles.length === 0) return;
@@ -89,7 +109,10 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
     if (activeSymbol === 'BTCUSD' && liveBtcCandles && liveBtcCandles.length > 0) {
       const firstOpen = liveBtcCandles[0].open || base.lastPrice;
       const latestClose = liveBtcPrice ?? liveBtcCandles[liveBtcCandles.length - 1].close;
-      const pct = firstOpen > 0 ? Number((((latestClose - firstOpen) / firstOpen) * 100).toFixed(2)) : base.changePercent;
+      const pct =
+        firstOpen > 0
+          ? Number((((latestClose - firstOpen) / firstOpen) * 100).toFixed(2))
+          : base.changePercent;
       return {
         ...base,
         exchange: btcFeedTag,
@@ -98,8 +121,20 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
         candles: liveBtcCandles,
       };
     }
-    return base;
-  }, [activeSymbol, liveBtcCandles, liveBtcPrice, btcFeedTag]);
+    const adaptedCandles = adaptCandlesForTimeframe(base.candles, timeframe);
+    const firstOpen = adaptedCandles[0]?.open || base.lastPrice;
+    const lastClose = adaptedCandles[adaptedCandles.length - 1]?.close || base.lastPrice;
+    const adaptedPct =
+      timeframe === '1h'
+        ? base.changePercent
+        : Number((((lastClose - firstOpen) / firstOpen) * 100).toFixed(2));
+    return {
+      ...base,
+      lastPrice: timeframe === '1h' ? base.lastPrice : Number(lastClose.toFixed(base.lastPrice < 10 ? 4 : 2)),
+      changePercent: adaptedPct,
+      candles: adaptedCandles,
+    };
+  }, [activeSymbol, liveBtcCandles, liveBtcPrice, btcFeedTag, timeframe]);
 
   const secondaryInstrument: SuperchartInstrument = useMemo(() => {
     return (
@@ -116,6 +151,25 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
   const mapY = (val: number, h = 230, pad = 18) =>
     pad + (1 - (val - priceMin) / range) * (h - pad * 2);
 
+  const emaValues = useMemo(() => computeCandleEma(candles, 5), [candles]);
+  const emaPolylinePoints = useMemo(() => {
+    const slotW = 610 / Math.max(1, candles.length);
+    return emaValues
+      .map((val, idx) => {
+        const cx = 195 + idx * slotW + slotW * 0.5;
+        const cy = mapY(val);
+        return `${cx.toFixed(1)},${cy.toFixed(1)}`;
+      })
+      .join(' ');
+  }, [emaValues, candles.length, priceMin, range]);
+
+  const inspectedCandle =
+    hoveredIndex !== null && candles[hoveredIndex]
+      ? candles[hoveredIndex]
+      : candles[candles.length - 1];
+
+  const decimals = activeInstrument.lastPrice < 10 ? 4 : 2;
+
   // Compute pseudo volume profile histogram bars on left margin
   const profileBuckets = [38, 62, 85, 100, 74, 48, 92, 66, 40, 28];
 
@@ -125,7 +179,7 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
       aria-label="Supercharged Supercharts"
       className="relative w-full bg-[#000000] text-white pt-16 pb-0 overflow-hidden"
     >
-      {/* Massive Stacked Headline Matching PDF Page 2 */}
+      {/* Massive Stacked Headline */}
       <div className="max-w-[1280px] mx-auto px-6 text-center mb-10">
         <h2
           className="font-display font-bold tracking-tight"
@@ -134,6 +188,9 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
           <span className="block text-[#868993]">Supercharged</span>
           <span className="block text-white">Supercharts</span>
         </h2>
+        <p className="text-sm text-[#9598A1] max-w-xl mx-auto mt-3">
+          Hover candles for live OHLC inspection, toggle Volume Profile, Fibonacci levels, and EMA overlays across global instruments.
+        </p>
       </div>
 
       {/* Multi-Pane Interactive Dark Superchart Workstation Container */}
@@ -148,6 +205,7 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
                   type="button"
                   onClick={() => {
                     setActiveSymbol(inst.symbol);
+                    setHoveredIndex(null);
                     onSelectSymbol?.(inst.symbol);
                   }}
                   className={`px-3 py-1 rounded text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
@@ -167,7 +225,10 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
                   <button
                     key={tf}
                     type="button"
-                    onClick={() => setTimeframe(tf)}
+                    onClick={() => {
+                      setTimeframe(tf);
+                      setHoveredIndex(null);
+                    }}
                     className={`px-2 py-1 rounded text-xs font-mono transition-colors cursor-pointer ${
                       timeframe === tf
                         ? 'bg-[#2A2E39] text-white font-semibold'
@@ -180,7 +241,7 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShowVolumeProfile((prev) => !prev)}
@@ -208,6 +269,31 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
                 <SlidersHorizontal className="w-3.5 h-3.5" />
                 <span>Fib Levels</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setShowEmaLine((prev) => !prev)}
+                aria-pressed={showEmaLine}
+                className={`px-2.5 py-1 rounded text-xs font-medium inline-flex items-center gap-1.5 border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                  showEmaLine
+                    ? 'border-[#089981]/60 bg-[#089981]/15 text-[#4ADE80]'
+                    : 'border-[#2A2E39] text-[#787B86] hover:text-white'
+                }`}
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>EMA 20</span>
+              </button>
+
+              {onOpenTerminal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenTerminal(activeInstrument.symbol)}
+                  className="px-3 py-1 rounded bg-white text-[#131722] hover:bg-[#F0F3FA] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <span>Analyze {activeInstrument.symbol}</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -229,10 +315,12 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
 
             {/* Primary Interactive Candlestick + Volume Profile Chart */}
             <div className="lg:col-span-11 p-4 md:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2 text-xs md:text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
                   <span className="font-semibold text-white">{activeInstrument.title}</span>
-                  <span className="text-[#787B86]">· {activeInstrument.exchange} · {timeframe}</span>
+                  <span className="text-[#787B86]">
+                    · {activeInstrument.exchange} · {timeframe}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 font-mono text-xs tabular-nums">
                   <span className="text-white font-semibold">
@@ -249,11 +337,40 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
                 </div>
               </div>
 
+              {/* Interactive OHLC Readout Strip */}
+              {inspectedCandle && (
+                <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-[#9598A1] mb-2 tabular-nums">
+                  <span className="text-[#D1D4DC]">{inspectedCandle.time}</span>
+                  <span>
+                    O <strong className="text-white font-medium">{inspectedCandle.open.toFixed(decimals)}</strong>
+                  </span>
+                  <span>
+                    H <strong className="text-white font-medium">{inspectedCandle.high.toFixed(decimals)}</strong>
+                  </span>
+                  <span>
+                    L <strong className="text-white font-medium">{inspectedCandle.low.toFixed(decimals)}</strong>
+                  </span>
+                  <span>
+                    C{' '}
+                    <strong
+                      className={`font-medium ${
+                        inspectedCandle.close >= inspectedCandle.open
+                          ? 'text-[#089981]'
+                          : 'text-[#F23645]'
+                      }`}
+                    >
+                      {inspectedCandle.close.toFixed(decimals)}
+                    </strong>
+                  </span>
+                </div>
+              )}
+
               <svg
                 viewBox="0 0 880 245"
                 className="w-full h-[230px] md:h-[260px] select-none"
                 role="img"
                 aria-label={`${activeInstrument.symbol} multi-pane candlestick superchart`}
+                onMouseLeave={() => setHoveredIndex(null)}
               >
                 {/* Horizontal Subtle Grid Lines */}
                 {[45, 95, 145, 195].map((yPos) => (
@@ -291,18 +408,47 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
                 {/* Fibonacci Retracement Reference Lines */}
                 {showFibLevels && (
                   <g>
-                    <line x1="170" y1="68" x2="815" y2="68" stroke="#F59E0B" strokeOpacity="0.45" strokeDasharray="5 4" />
+                    <line
+                      x1="170"
+                      y1="68"
+                      x2="815"
+                      y2="68"
+                      stroke="#F59E0B"
+                      strokeOpacity="0.45"
+                      strokeDasharray="5 4"
+                    />
                     <text x="174" y="63" fill="#FCD34D" fontSize="10" fontFamily="monospace">
                       0.618 (VAH)
                     </text>
-                    <line x1="170" y1="128" x2="815" y2="128" stroke="#2962FF" strokeOpacity="0.55" strokeDasharray="5 4" />
+                    <line
+                      x1="170"
+                      y1="128"
+                      x2="815"
+                      y2="128"
+                      stroke="#2962FF"
+                      strokeOpacity="0.55"
+                      strokeDasharray="5 4"
+                    />
                     <text x="174" y="123" fill="#90CAF9" fontSize="10" fontFamily="monospace">
                       0.500 (POC)
                     </text>
                   </g>
                 )}
 
-                {/* Candlesticks */}
+                {/* EMA 20 Smoothed Trend Line */}
+                {showEmaLine && emaPolylinePoints && (
+                  <polyline
+                    points={emaPolylinePoints}
+                    fill="none"
+                    stroke="#38BDF8"
+                    strokeWidth="1.75"
+                    strokeOpacity="0.88"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
+
+                {/* Candlesticks with Interactive Hover Crosshair */}
                 {candles.map((c, idx) => {
                   const slotW = 610 / candles.length;
                   const cx = 195 + idx * slotW + slotW * 0.5;
@@ -314,10 +460,51 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
                   const bodyTop = Math.min(yOpen, yClose);
                   const bodyH = Math.max(4, Math.abs(yClose - yOpen));
                   const fill = isUp ? '#089981' : '#F23645';
+                  const isHovered = hoveredIndex === idx;
 
                   return (
-                    <g key={c.time}>
-                      <line x1={cx} y1={yHigh} x2={cx} y2={yLow} stroke={fill} strokeWidth="2" />
+                    <g
+                      key={c.time}
+                      onMouseEnter={() => setHoveredIndex(idx)}
+                      className="cursor-crosshair"
+                    >
+                      {isHovered && (
+                        <>
+                          <line
+                            x1={cx}
+                            y1="10"
+                            x2={cx}
+                            y2="230"
+                            stroke="#60A5FA"
+                            strokeOpacity="0.45"
+                            strokeDasharray="3 3"
+                          />
+                          <line
+                            x1="170"
+                            y1={yClose}
+                            x2="825"
+                            y2={yClose}
+                            stroke="#60A5FA"
+                            strokeOpacity="0.45"
+                            strokeDasharray="3 3"
+                          />
+                        </>
+                      )}
+                      <rect
+                        x={cx - slotW * 0.45}
+                        y="10"
+                        width={slotW * 0.9}
+                        height="220"
+                        fill="transparent"
+                      />
+                      <line
+                        x1={cx}
+                        y1={yHigh}
+                        x2={cx}
+                        y2={yLow}
+                        stroke={fill}
+                        strokeWidth={isHovered ? '2.5' : '2'}
+                      />
                       <rect
                         x={cx - 10}
                         y={bodyTop}
@@ -325,6 +512,8 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
                         height={bodyH}
                         rx="1.5"
                         fill={fill}
+                        stroke={isHovered ? '#FFFFFF' : 'none'}
+                        strokeWidth={isHovered ? '1' : '0'}
                       />
                     </g>
                   );
@@ -351,7 +540,7 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
             </div>
           </div>
 
-          {/* Bottom Split Sub-Charts Row Matching PDF Page 2 */}
+          {/* Bottom Split Sub-Charts Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[#2A2E39] bg-[#131722]">
             <div className="p-4">
               <div className="flex items-center justify-between text-xs mb-2">
@@ -378,7 +567,9 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
 
             <div className="p-4 flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs mb-2">
-                <span className="font-semibold text-[#D1D4DC]">Multi-Pane Oscillator &amp; Breadth</span>
+                <span className="font-semibold text-[#D1D4DC]">
+                  Multi-Pane Oscillator &amp; Breadth
+                </span>
                 <span className="font-mono text-[#F23645] tabular-nums">RSI 58.4</span>
               </div>
               <svg viewBox="0 0 400 72" className="w-full h-16">
@@ -394,7 +585,7 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
           </div>
         </div>
 
-        {/* Centered CTA Under Chart Matching PDF Page 2 */}
+        {/* Centered CTA Under Chart */}
         <div className="mt-8 flex flex-col items-center text-center">
           <button
             type="button"
@@ -415,15 +606,21 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({ onSelect
             <div className="mt-4 max-w-2xl w-full rounded-xl bg-[#131722] border border-[#2A2E39] p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-left text-xs">
               <div>
                 <div className="font-semibold text-white mb-1">110+ Drawing Tools</div>
-                <p className="text-[#9598A1]">Fibonacci fans, Pitchforks, Gann boxes, and anchored VWAP directly in browser.</p>
+                <p className="text-[#9598A1]">
+                  Fibonacci fans, Pitchforks, Gann boxes, and anchored VWAP directly in browser.
+                </p>
               </div>
               <div>
                 <div className="font-semibold text-white mb-1">16+ Chart Types</div>
-                <p className="text-[#9598A1]">TPO Volume Profiles, Renko, Heikin Ashi, Kagi, and baseline spread overlays.</p>
+                <p className="text-[#9598A1]">
+                  TPO Volume Profiles, Renko, Heikin Ashi, Kagi, and baseline spread overlays.
+                </p>
               </div>
               <div>
                 <div className="font-semibold text-white mb-1">Pine Script Engine</div>
-                <p className="text-[#9598A1]">Run 100,000+ community scripts and custom backtested trading strategies.</p>
+                <p className="text-[#9598A1]">
+                  Run 100,000+ community scripts and custom backtested trading strategies.
+                </p>
               </div>
             </div>
           )}

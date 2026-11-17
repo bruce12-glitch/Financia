@@ -221,23 +221,32 @@ export const EarthHeroSection: React.FC<EarthHeroSectionProps> = ({
           Real-time charts, SEC filing synthesis, and live market intelligence for 100M+ investors.
         </p>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (currentUser && onEnterFrontend) {
-              onEnterFrontend();
-            } else {
-              onOpenSignup();
-            }
-          }}
-          className="px-6 py-2.5 rounded-xl bg-white text-[#131722] font-semibold text-sm hover:bg-[#F0F3FA] transition-colors shadow-xl cursor-pointer whitespace-nowrap shrink-0"
-        >
-          {currentUser ? 'Open Frontend & 3D World' : 'Get started for free'}
-        </button>
-        <p className="text-[11px] text-[#E5E7EB] mt-2 font-medium drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (currentUser && onEnterFrontend) {
+                onEnterFrontend();
+              } else {
+                onOpenSignup();
+              }
+            }}
+            className="px-6 py-2.5 rounded-xl bg-white text-[#131722] font-semibold text-sm hover:bg-[#F0F3FA] transition-colors shadow-xl cursor-pointer whitespace-nowrap shrink-0"
+          >
+            {currentUser ? 'Open Frontend & 3D World' : 'Get started for free'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onJumpToSection('supercharts-section')}
+            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/18 border border-white/20 text-white font-medium text-sm transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          >
+            Explore Supercharts
+          </button>
+        </div>
+        <p className="text-[11px] text-[#E5E7EB] mt-2.5 font-medium drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
           {currentUser
             ? `Signed in as ${currentUser.name} · Access Live Terminal & 3D Exchanges`
-            : '$0 forever, no credit card needed'}
+            : '$0 forever · 150+ global exchanges · SEC EDGAR & crypto telemetry'}
         </p>
       </div>
 

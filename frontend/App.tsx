@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, Globe2, Lock, X } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 import {
   EarthHeroSection,
+  LandingAccessGateSection,
+  LandingCapabilitiesSection,
   RocketFooterSection,
   SuperchartsSection,
 } from '../landing';
@@ -513,70 +515,33 @@ export default function App() {
           />
 
           {/* 2. Supercharged Supercharts Interactive Multi-Pane Showcase */}
-          <SuperchartsSection />
+          <SuperchartsSection
+            onSelectSymbol={handleSelectHeroTicker}
+            onOpenTerminal={handleOpenInTerminal}
+          />
 
-          {/* 3. Authenticated Frontend & 3D World Entry Gate */}
-          <section
-            id="frontend-access-gate"
-            aria-label="Frontend Terminal and 3D Market Atlas Access"
-            className="w-full bg-[#090B10] text-white border-t border-[#1E222D] py-16 px-4 md:px-10"
-          >
-            <div className="max-w-5xl mx-auto rounded-2xl border border-[#252A36] bg-[#0F131C] p-8 md:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-              <div className="max-w-2xl">
-                <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#60A5FA] mb-2">
-                  {authSession ? <Globe2 className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                  <span>
-                    {authSession
-                      ? 'Authenticated Frontend Ready'
-                      : 'Sign in to unlock Frontend Workspace & 3D World'}
-                  </span>
-                </div>
-                <h2 className="font-display font-bold text-2xl md:text-3xl tracking-[-0.02em] text-white">
-                  Live Stock Terminal, Heatmaps &amp; 3D Global Stock Exchanges
-                </h2>
-                <p className="text-sm text-[#9598A1] mt-2 leading-relaxed">
-                  {authSession
-                    ? `Welcome back, ${authSession.user.name}. Launch the authenticated frontend workspace to inspect live SEC filings, earnings calendars, and the 3D global exchange globe.`
-                    : 'Create a free Financia account or log in to redirect into the full research frontend featuring the interactive 3D global stock exchanges atlas, sector heatmaps, and live SEC synthesis.'}
-                </p>
-              </div>
+          {/* 3. Institutional Multi-Agent & 3D World Architecture Bento */}
+          <LandingCapabilitiesSection
+            onRequestWorkspace={(sectionId, ticker) => {
+              if (ticker) setSelectedTicker(ticker);
+              handleJumpToSection(sectionId);
+            }}
+            onInspectSymbol={handleSelectHeroTicker}
+          />
 
-              <div className="flex flex-wrap items-center gap-3 shrink-0">
-                {authSession ? (
-                  <button
-                    type="button"
-                    onClick={() => enterFrontend()}
-                    className="px-5 py-3 rounded-xl bg-[#2962FF] hover:bg-[#1E53E5] text-white text-sm font-semibold transition-colors cursor-pointer"
-                  >
-                    Enter Frontend Workspace
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthInitialMode('signup');
-                        setSignupOpen(true);
-                      }}
-                      className="px-5 py-3 rounded-xl bg-white hover:bg-[#F0F3FA] text-[#131722] text-sm font-semibold transition-colors cursor-pointer"
-                    >
-                      Sign up free
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthInitialMode('login');
-                        setSignupOpen(true);
-                      }}
-                      className="px-5 py-3 rounded-xl border border-[#363A45] hover:border-[#6A6E7A] text-white text-sm font-semibold transition-colors cursor-pointer"
-                    >
-                      Log in
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </section>
+          {/* 4. Authenticated Frontend & 3D World Entry Gate */}
+          <LandingAccessGateSection
+            currentUser={authSession?.user || null}
+            onOpenSignup={() => {
+              setAuthInitialMode('signup');
+              setSignupOpen(true);
+            }}
+            onOpenLogin={() => {
+              setAuthInitialMode('login');
+              setSignupOpen(true);
+            }}
+            onEnterFrontend={() => enterFrontend()}
+          />
         </main>
       )}
 
