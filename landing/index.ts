@@ -1,6 +1,7 @@
 export { EarthHeroSection } from './EarthHeroSection';
 export { HeroTickerMarquee } from './HeroTickerMarquee';
 export { SuperchartsSection } from './SuperchartsSection';
+export { LandingSentimentSection } from './LandingSentimentSection';
 export { LandingCapabilitiesSection } from './LandingCapabilitiesSection';
 export { LandingAccessGateSection } from './LandingAccessGateSection';
 export { RocketFooterSection } from './RocketFooterSection';
