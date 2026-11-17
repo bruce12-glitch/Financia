@@ -4,6 +4,7 @@ import {
   EarthHeroSection,
   LandingAccessGateSection,
   LandingCapabilitiesSection,
+  LandingSentimentSection,
   RocketFooterSection,
   SuperchartsSection,
 } from '../landing';
@@ -520,7 +521,13 @@ export default function App() {
             onOpenTerminal={handleOpenInTerminal}
           />
 
-          {/* 3. Institutional Multi-Agent & 3D World Architecture Bento */}
+          {/* 3. Real-Time Market Sentiment Gauge (News Volume & Price Trends) */}
+          <LandingSentimentSection
+            onSelectNews={setSelectedNews}
+            onRequestWorkspace={handleJumpToSection}
+          />
+
+          {/* 4. Institutional Multi-Agent & 3D World Architecture Bento */}
           <LandingCapabilitiesSection
             onRequestWorkspace={(sectionId, ticker) => {
               if (ticker) setSelectedTicker(ticker);
