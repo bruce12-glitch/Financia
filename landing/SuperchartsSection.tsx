@@ -118,7 +118,7 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({
         exchange: goldFeedTag,
         lastPrice: latestClose,
         changePercent: pct,
-        candles: liveBtcCandles,
+        candles: liveGoldCandles,
       };
     }
     const adaptedCandles = adaptCandlesForTimeframe(base.candles, timeframe);
@@ -134,12 +134,13 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({
       changePercent: adaptedPct,
       candles: adaptedCandles,
     };
-  }, [activeSymbol, liveBtcCandles, liveBtcPrice, btcFeedTag, timeframe]);
+  }, [activeSymbol, liveGoldCandles, liveGoldPrice, goldFeedTag, timeframe]);
 
   const secondaryInstrument: SuperchartInstrument = useMemo(() => {
     return (
       SUPERCHART_INSTRUMENTS.find((item) => item.symbol !== activeSymbol) ||
-      SUPERCHART_INSTRUMENTS[2]
+      SUPERCHART_INSTRUMENTS[1] ||
+      SUPERCHART_INSTRUMENTS[0]
     );
   }, [activeSymbol]);
 
@@ -189,7 +190,7 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({
           <span className="block text-white">Supercharts</span>
         </h2>
         <p className="text-sm text-[#9598A1] max-w-xl mx-auto mt-3">
-          Hover candles for live OHLC inspection, toggle Volume Profile, Fibonacci levels, and EMA overlays across global instruments.
+          Hover candles for live OHLC inspection, toggle Volume Profile, Fibonacci levels, and EMA overlays across Gold ETFs, LBMA spot gold, index ETFs, and bond funds.
         </p>
       </div>
 
@@ -605,21 +606,21 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({
           {featuresExpanded && (
             <div className="mt-4 max-w-2xl w-full rounded-xl bg-[#131722] border border-[#2A2E39] p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-left text-xs">
               <div>
-                <div className="font-semibold text-white mb-1">110+ Drawing Tools</div>
+                <div className="font-semibold text-white mb-1">AMFI &amp; Yield Analytics</div>
                 <p className="text-[#9598A1]">
-                  Fibonacci fans, Pitchforks, Gann boxes, and anchored VWAP directly in browser.
+                  Live scheme NAV trajectories, Direct TER spread tracking, and modified Gilt duration curves.
                 </p>
               </div>
               <div>
-                <div className="font-semibold text-white mb-1">16+ Chart Types</div>
+                <div className="font-semibold text-white mb-1">Gold &amp; ETF Profiles</div>
                 <p className="text-[#9598A1]">
-                  TPO Volume Profiles, Renko, Heikin Ashi, Kagi, and baseline spread overlays.
+                  Volume Profile POC bands, iNAV parity levels, and sovereign bullion baseline overlays.
                 </p>
               </div>
               <div>
-                <div className="font-semibold text-white mb-1">Pine Script Engine</div>
+                <div className="font-semibold text-white mb-1">4-Pillar Rolling RSI</div>
                 <p className="text-[#9598A1]">
-                  Run 100,000+ community scripts and custom backtested trading strategies.
+                  Compare Mutual Funds, Gold BeES, Debt Funds, and broad ETFs side-by-side in one terminal.
                 </p>
               </div>
             </div>
