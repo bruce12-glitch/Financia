@@ -203,3 +203,105 @@ export const TerminalPriceTrendChart: React.FC<TerminalPriceTrendChartProps> = (
                 tickLine={false}
                 minTickGap={28}
               />
+              <YAxis
+                domain={yDomain}
+                width={62}
+                tickFormatter={(val: number) => `${symbolPrefix}${val.toFixed(0)}`}
+                tick={{ fill: '#6B7280', fontSize: 11, fontFamily: 'ui-monospace, monospace' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                content={<TrendChartTooltip currency={currency} />}
+                cursor={{ stroke: '#9CA3AF', strokeWidth: 1, strokeDasharray: '3 3' }}
+              />
+              <ReferenceLine
+                y={summary.startPrice}
+                stroke="#9CA3AF"
+                strokeDasharray="4 4"
+                strokeWidth={1}
+              />
+              <Area
+                type="monotone"
+                dataKey="price"
+                name={`${stock.ticker} Price`}
+                stroke={strokeColor}
+                strokeWidth={2.25}
+                fill={`url(#${gradientId})`}
+                activeDot={{ r: 5, fill: strokeColor, stroke: '#FFFFFF', strokeWidth: 2 }}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          ) : (
+            <LineChart data={series} margin={{ top: 10, right: 26, left: 4, bottom: 4 }}>
+              <CartesianGrid stroke="#F3F4F6" strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="dateLabel"
+                tick={{ fill: '#6B7280', fontSize: 11, fontFamily: 'ui-monospace, monospace' }}
+                axisLine={{ stroke: '#E5E7EB' }}
+                tickLine={false}
+                minTickGap={28}
+              />
+              <YAxis
+                domain={yDomain}
+                width={62}
+                tickFormatter={(val: number) => `${symbolPrefix}${val.toFixed(0)}`}
+                tick={{ fill: '#6B7280', fontSize: 11, fontFamily: 'ui-monospace, monospace' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                content={<TrendChartTooltip currency={currency} />}
+                cursor={{ stroke: '#9CA3AF', strokeWidth: 1, strokeDasharray: '3 3' }}
+              />
+              <ReferenceLine
+                y={summary.startPrice}
+                stroke="#9CA3AF"
+                strokeDasharray="4 4"
+                strokeWidth={1}
+              />
+              <Line
+                type="monotone"
+                dataKey="price"
+                name={`${stock.ticker} Price`}
+                stroke={strokeColor}
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 5, fill: strokeColor, stroke: '#FFFFFF', strokeWidth: 2 }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+
+      {/* 30-Day Period Telemetry Footer */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 mt-4 border-t border-[#F3F4F6]">
+        <div>
+          <div className="text-[11px] text-[#6B7280]">30D Entry Close</div>
+          <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
+            {formatCurrency(summary.startPrice, 2, currency)}
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] text-[#6B7280]">30D Period High</div>
+          <div className="text-sm font-mono font-semibold text-[#089981] tabular-nums mt-0.5">
+            {formatCurrency(summary.periodHigh, 2, currency)}
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] text-[#6B7280]">30D Period Low</div>
+          <div className="text-sm font-mono font-semibold text-[#F23645] tabular-nums mt-0.5">
+            {formatCurrency(summary.periodLow, 2, currency)}
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] text-[#6B7280]">30D Avg Volume</div>
+          <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
+            {summary.avgVolume.toFixed(1)}M
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
