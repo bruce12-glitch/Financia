@@ -95,7 +95,7 @@ export const EarningsCalendarTab: React.FC<EarningsCalendarTabProps> = ({
             </h2>
           </div>
           <p className="text-xs text-[#787B86] mt-1 flex flex-wrap items-center gap-1.5 tabular-nums">
-            <span>{filteredEvents.length} upcoming releases</span>
+            <span>{filteredEvents.length} upcoming milestones</span>
             <span aria-hidden="true">·</span>
             <span>{sourceLabel}</span>
             <span aria-hidden="true">·</span>
@@ -150,8 +150,8 @@ export const EarningsCalendarTab: React.FC<EarningsCalendarTabProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter by ticker or company (e.g., NVDA, TCS)..."
-            aria-label="Search upcoming earnings"
+            placeholder="Filter by fund, gold ETF, or central bank (e.g., GOLDBEES, SBIGILT, PPFAS)..."
+            aria-label="Search upcoming NFO, SGB, or policy events"
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E0E3EB] bg-[#F8F9FD] text-xs text-[#131722] placeholder:text-[#787B86] focus:outline-none focus:border-[#2962FF]"
           />
         </div>
@@ -178,10 +178,10 @@ export const EarningsCalendarTab: React.FC<EarningsCalendarTabProps> = ({
         /* Empty Search State */
         <div className="py-12 text-center">
           <p className="text-sm font-semibold text-[#131722]">
-            No upcoming earnings match &ldquo;{searchQuery}&rdquo;
+            No upcoming policy or fund events match &ldquo;{searchQuery}&rdquo;
           </p>
           <p className="text-xs text-[#787B86] mt-1">
-            Try clearing the filter or switching back to All Markets.
+            Try clearing the filter or switching back to All 4 Pillars.
           </p>
           <button
             type="button"
@@ -200,11 +200,11 @@ export const EarningsCalendarTab: React.FC<EarningsCalendarTabProps> = ({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-[#E0E3EB] text-[11px] font-semibold text-[#787B86] uppercase tracking-wide">
-                <th className="py-3 pr-4">Ticker &amp; Quarter</th>
-                <th className="py-3 px-4">Release Window</th>
+                <th className="py-3 pr-4">Instrument &amp; Cycle</th>
+                <th className="py-3 px-4">Window</th>
                 <th className="py-3 px-4">Countdown</th>
-                <th className="py-3 px-4 text-right">EPS Est. / Prior</th>
-                <th className="py-3 px-4 text-right">Revenue Est.</th>
+                <th className="py-3 px-4 text-right">Benchmark / Est. YTM</th>
+                <th className="py-3 px-4 text-right">AUM / Tranche Size</th>
                 <th className="py-3 pl-4 text-right">Research</th>
               </tr>
             </thead>
