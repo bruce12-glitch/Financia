@@ -1,8 +1,9 @@
 export type MarketCategory =
   | 'indices'
-  | 'indian_stocks'
-  | 'crypto'
-  | 'futures'
+  | 'mutual_funds'
+  | 'gold'
+  | 'debt_funds'
+  | 'etfs'
   | 'forex'
   | 'economy';
 
@@ -38,7 +39,7 @@ export interface WireNewsItem {
   source: string;
   headline: string;
   summary: string;
-  category: 'top' | 'forex' | 'futures' | 'indian_stocks' | 'crypto';
+  category: 'top' | 'forex' | 'gold_debt' | 'mutual_funds' | 'etfs';
   tickers: string[];
   locked?: boolean;
   flash?: boolean;
@@ -60,9 +61,15 @@ export interface CommunityIdeaItem {
   timeLabel: string;
   comments: number;
   boosts: number;
-  category: 'editors' | 'popular' | 'indian' | 'futures' | 'forex' | 'crypto';
+  category: 'editors' | 'popular' | 'mutual_funds' | 'gold' | 'debt' | 'forex';
   symbol: string;
-  chartType: 'bearish_fib' | 'bullish_breakout' | 'golden_channel' | 'eurusd_4h' | 'volume_profile' | 'cci_oscillator';
+  chartType:
+    | 'bearish_fib'
+    | 'bullish_breakout'
+    | 'golden_channel'
+    | 'eurusd_4h'
+    | 'volume_profile'
+    | 'cci_oscillator';
   priceAxisLabels: string[];
 }
 
