@@ -72,24 +72,50 @@ export const SectorHeatmap: React.FC<SectorHeatmapProps> = ({
   const totals = useMemo(() => {
     const allTiles = groups.flatMap((g) => g.tiles);
     const totalCap = allTiles.reduce((s, t) => s + t.marketCapB, 0);
-    const weighted = allTiles.reduce((s, t) => s + t.changePercent * t.marketCapB, 0);
+    const weightedReturn = allTiles.reduce((s, t) => s + t.changePercent * t.marketCapB, 0);
+    const weightedVol = allTiles.reduce(
+      (s, t) => s + calculateRealizedVolatility(t.sparkline, t.changePercent) * t.marketCapB,
+      0
+    );
     return {
       count: allTiles.length,
       advancers: allTiles.filter((t) => t.changePercent > 0).length,
       decliners: allTiles.filter((t) => t.changePercent < 0).length,
-      weightedAvg: totalCap > 0 ? Number((weighted / totalCap).toFixed(2)) : 0,
+      weightedAvg: totalCap > 0 ? Number((weightedReturn / totalCap).toFixed(2)) : 0,
+      weightedVolatility: totalCap > 0 ? Number((weightedVol / totalCap).toFixed(1)) : 0,
       defaultHighlight: allTiles[0] || null,
     };
   }, [groups]);
 
-  const inspectedTile = hoveredTile && groups.some((g) => g.tiles.some((t) => t.symbol === hoveredTile.symbol))
-    ? hoveredTile
-    : totals.defaultHighlight;
+  const hoveredTileRect = useMemo(() => {
+    if (!hoveredSymbol) return null;
+    return treemapLayout.tiles.find((item) => item.tile.symbol === hoveredSymbol) || null;
+  }, [hoveredSymbol, treemapLayout.tiles]);
+
+  const inspectedTile = useMemo(() => {
+    if (hoveredTileRect) return hoveredTileRect.tile;
+    return totals.defaultHighlight;
+  }, [hoveredTileRect, totals.defaultHighlight]);
+
+  const inspectedVolatility = useMemo(() => {
+    if (!inspectedTile) return 0;
+    return calculateRealizedVolatility(inspectedTile.sparkline, inspectedTile.changePercent);
+  }, [inspectedTile]);
 
   const handleMarketSwitch = (next: HeatmapMarket) => {
     setMarket(next);
     setSectorFilter('All');
-    setHoveredTile(null);
+    setHoveredSymbol(null);
+    setPointerPos(null);
+  };
+
+  const handleMouseMoveContainer = (e: React.MouseEvent<HTMLDivElement>) => {
+    const box = containerRef.current?.getBoundingClientRect();
+    if (!box) return;
+    setPointerPos({
+      x: e.clientX - box.left,
+      y: e.clientY - box.top,
+    });
   };
 
   return (
@@ -97,15 +123,19 @@ export const SectorHeatmap: React.FC<SectorHeatmapProps> = ({
       data-testid="sector-heatmap"
       data-market={market}
       data-sector={sectorFilter}
+      data-color-mode={colorMode}
+      data-tick-count={tickCount}
       className="rounded-2xl border border-[#E0E3EB] bg-white p-5 md:p-6 mt-5"
     >
       {/* Header Row */}
       <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-[#F0F3FA]">
         <div>
           <h3 className="text-base md:text-lg font-display font-bold text-[#131722]">
-            Sector performance heatmap
+            Real-time 4-pillar volatility heatmap
           </h3>
-          <p className="text-xs text-[#787B86] mt-0.5 flex flex-wrap items-center gap-1.5 tabular-nums">
+          <p className="text-xs text-[#787B86] mt-1 flex flex-wrap items-center gap-1.5 tabular-nums">
+            <span>D3 squarified treemap</span>
+            <span aria-hidden="true">·</span>
             <span>{totals.advancers} gainers</span>
             <span aria-hidden="true">·</span>
             <span>{totals.decliners} decliners</span>
@@ -115,25 +145,64 @@ export const SectorHeatmap: React.FC<SectorHeatmapProps> = ({
                 totals.weightedAvg >= 0 ? 'text-[#089981]' : 'text-[#F23645]'
               }`}
             >
-              Cap-weighted {formatSignedPercent(totals.weightedAvg)}
+              AUM-weighted {formatSignedPercent(totals.weightedAvg)}
             </span>
+            <span aria-hidden="true">·</span>
+            <span className="font-semibold text-[#131722]">
+              Mean σ {totals.weightedVolatility.toFixed(1)}%
+            </span>
+            <span aria-hidden="true">·</span>
+            <span className="font-mono text-[#787B86]">Tick #{tickCount}</span>
           </p>
         </div>
 
-        {/* Market Switcher & Color Legend */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-mono text-[#787B86] tabular-nums">
-            <span>−3%</span>
-            <span className="inline-flex h-2.5 w-20 rounded overflow-hidden">
-              <span className="flex-1 bg-[#B91C1C]" />
-              <span className="flex-1 bg-[#F23645]" />
-              <span className="flex-1 bg-[#E2E8F0]" />
-              <span className="flex-1 bg-[#089981]" />
-              <span className="flex-1 bg-[#057A55]" />
-            </span>
-            <span>+3%</span>
+        {/* Stream Control, Color Scale, Mode Switcher, Market Switcher */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            data-testid="heatmap-stream-toggle"
+            onClick={() => setIsStreaming((prev) => !prev)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+              isStreaming
+                ? 'border-[#0F766E]/30 bg-[#ECFDF5] text-[#0F766E]'
+                : 'border-[#E0E3EB] bg-[#F8F9FD] text-[#434651]'
+            }`}
+            title={isStreaming ? 'Pause real-time volatility ticks' : 'Resume real-time volatility ticks'}
+          >
+            {isStreaming ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            <span>{isStreaming ? 'Live feed' : 'Paused'}</span>
+          </button>
+
+          {/* Color Mode Switcher */}
+          <div
+            role="group"
+            aria-label="Heatmap color metric"
+            className="inline-flex items-center p-1 rounded-lg bg-[#F0F3FA] gap-1"
+          >
+            {(
+              [
+                { id: 'volatility', label: 'Volatility (σ)' },
+                { id: 'performance', label: 'Return (%)' },
+              ] as const
+            ).map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                data-testid={`heatmap-mode-${mode.id}`}
+                aria-pressed={colorMode === mode.id}
+                onClick={() => setColorMode(mode.id)}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                  colorMode === mode.id
+                    ? 'bg-[#131722] text-white'
+                    : 'text-[#434651] hover:text-[#131722]'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
           </div>
 
+          {/* Market Switcher */}
           <div
             role="tablist"
             aria-label="Heatmap market scope"
