@@ -92,8 +92,6 @@ const FOOTER_COLUMNS = [
           { label: 'Space mission', target: 'rocket-footer' },
           { label: 'Research Briefings', target: 'forex-section' },
           { label: 'Help Center', target: 'economy-section' },
-          { label: 'Careers', target: 'rocket-footer' },
-          { label: 'Media kit', target: 'rocket-footer' },
         ],
       },
       {
@@ -102,11 +100,8 @@ const FOOTER_COLUMNS = [
           { label: 'Terms of Use', target: 'rocket-footer' },
           { label: 'Disclaimer', target: 'rocket-footer' },
           { label: 'Privacy Policy', target: 'rocket-footer' },
-          { label: 'Cookies Policy', target: 'rocket-footer' },
-          { label: 'Accessibility Statement', target: 'rocket-footer' },
           { label: 'Trust Center', target: 'rocket-footer' },
           { label: 'Security tips', target: 'rocket-footer' },
-          { label: 'Status page', target: 'rocket-footer' },
         ],
       },
     ],
@@ -114,31 +109,20 @@ const FOOTER_COLUMNS = [
   {
     groups: [
       {
-        heading: 'COMMUNITY',
+        heading: 'COMMUNITY DESKS',
         links: [
-          { label: 'Social network', target: 'market-summary' },
-          { label: 'Wall of Love', target: 'market-summary' },
-          { label: 'Refer a friend', target: 'market-summary' },
-          { label: 'Creator program', target: 'market-summary' },
+          { label: 'SIP Allocators', target: 'market-summary' },
+          { label: 'Gold Vault Watch', target: 'market-summary' },
+          { label: 'Duration & Yield Notes', target: 'market-summary' },
           { label: 'House Rules', target: 'market-summary' },
-          { label: 'Moderators', target: 'market-summary' },
         ],
       },
       {
-        heading: 'IDEAS',
+        heading: 'ALLOCATION NOTES',
         links: [
-          { label: 'Trading', target: 'market-summary' },
-          { label: 'Education', target: 'market-summary' },
+          { label: 'Core & Satellite', target: 'market-summary' },
+          { label: 'Duration Strategy', target: 'market-summary' },
           { label: "Editors' picks", target: 'market-summary' },
-        ],
-      },
-      {
-        heading: 'PINE SCRIPT',
-        links: [
-          { label: 'Indicators & strategies', target: 'market-summary' },
-          { label: 'Wizards', target: 'market-summary' },
-          { label: 'Freelancers', target: 'market-summary' },
-          { label: 'Marketplace', target: 'market-summary' },
         ],
       },
     ],
@@ -148,20 +132,18 @@ const FOOTER_COLUMNS = [
       {
         heading: 'BUSINESS SOLUTIONS',
         links: [
-          { label: 'Widgets', target: 'supercharts-section' },
+          { label: 'AMFI NAV Widgets', target: 'supercharts-section' },
           { label: 'Charting libraries', target: 'supercharts-section' },
-          { label: 'Lightweight Charts™', target: 'supercharts-section' },
-          { label: 'Advanced Charts', target: 'supercharts-section' },
-          { label: 'Trading Platform', target: 'supercharts-section' },
+          { label: 'Yield Curve SDK', target: 'supercharts-section' },
+          { label: 'RIA Desk Portal', target: 'live-terminal' },
         ],
       },
       {
-        heading: 'GROWTH OPPORTUNITIES',
+        heading: 'INSTITUTIONAL PARTNERS',
         links: [
-          { label: 'Advertising', target: 'rocket-footer' },
-          { label: 'Brokerage integration', target: 'economy-section' },
+          { label: 'AMC Factsheet Sync', target: 'rocket-footer' },
+          { label: 'Custodian Integration', target: 'economy-section' },
           { label: 'Partner program', target: 'rocket-footer' },
-          { label: 'Education program', target: 'rocket-footer' },
         ],
       },
     ],
@@ -325,16 +307,13 @@ export const RocketFooterSection: React.FC<RocketFooterSectionProps> = ({
             {/* Attribution Notes */}
             <div className="space-y-2 text-[11px] leading-relaxed text-[#787B86] max-w-xs">
               <p>
-                Select market data provided by <span className="text-[#2962FF]">ICE Data Services</span>.
+                Direct Mutual Fund &amp; Debt NAVs sourced via <span className="text-[#2962FF]">AMFI Feeds</span>.
               </p>
               <p>
-                Select reference data provided by FactSet. Copyright © 2026 FactSet Research Systems Inc.
+                Spot bullion &amp; Sovereign Gold Bond benchmarks calibrated to LBMA PM Fixings.
               </p>
               <p>
-                Copyright © 2026, American Bankers Association. CUSIP Database provided by FactSet Research Systems Inc.
-              </p>
-              <p>
-                SEC filings and other documents provided by <span className="text-[#2962FF]">Quartr</span>.
+                ETF factsheets, modified duration tables, and index tracking metrics © 2026 Financia.
               </p>
               <p>© 2026 Financia, Inc.</p>
             </div>
