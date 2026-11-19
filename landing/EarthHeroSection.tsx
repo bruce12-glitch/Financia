@@ -104,7 +104,7 @@ export const EarthHeroSection: React.FC<EarthHeroSectionProps> = ({
               onClick={() => onJumpToSection('live-terminal')}
               className="text-white font-semibold hover:text-[#60A5FA] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              Stock Analysis
+              Funds &amp; Gold Desk
             </button>
             <button
               type="button"
@@ -118,28 +118,28 @@ export const EarthHeroSection: React.FC<EarthHeroSectionProps> = ({
               onClick={() => onJumpToSection('market-summary')}
               className="hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              Markets
+              4-Pillar Markets
             </button>
             <button
               type="button"
               onClick={() => onJumpToSection('global-exchanges-globe')}
               className="hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              Exchanges 3D
+              3D Hubs
             </button>
             <button
               type="button"
               onClick={() => onJumpToSection('forex-section')}
               className="hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              Forex
+              Debt &amp; FX
             </button>
             <button
               type="button"
               onClick={() => onJumpToSection('economy-section')}
               className="hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              Economy
+              Policy &amp; Yields
             </button>
           </nav>
 
@@ -215,10 +215,10 @@ export const EarthHeroSection: React.FC<EarthHeroSectionProps> = ({
             textWrap: 'balance',
           }}
         >
-          Where the world does markets
+          Where the world does funds, gold &amp; bonds
         </h1>
         <p className="text-[#D1D4DC] text-sm md:text-[15px] leading-relaxed max-w-2xl mb-5 font-normal">
-          Real-time charts, SEC filing synthesis, and live market intelligence for 100M+ investors.
+          Live Mutual Fund NAVs, Gold BeES &amp; SGBs, sovereign Debt yields, and Index ETF intelligence for disciplined investors.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-3">
@@ -233,7 +233,7 @@ export const EarthHeroSection: React.FC<EarthHeroSectionProps> = ({
             }}
             className="px-6 py-2.5 rounded-xl bg-white text-[#131722] font-semibold text-sm hover:bg-[#F0F3FA] transition-colors shadow-xl cursor-pointer whitespace-nowrap shrink-0"
           >
-            {currentUser ? 'Open Frontend & 3D World' : 'Get started for free'}
+            {currentUser ? 'Open Funds, Gold & 3D World' : 'Get started for free'}
           </button>
           <button
             type="button"
@@ -245,8 +245,8 @@ export const EarthHeroSection: React.FC<EarthHeroSectionProps> = ({
         </div>
         <p className="text-[11px] text-[#E5E7EB] mt-2.5 font-medium drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
           {currentUser
-            ? `Signed in as ${currentUser.name} · Access Live Terminal & 3D Exchanges`
-            : '$0 forever · 150+ global exchanges · SEC EDGAR & crypto telemetry'}
+            ? `Signed in as ${currentUser.name} · Access Mutual Funds, Gold, Debt & 3D Market Hubs`
+            : '$0 forever · AMFI Direct NAVs · LBMA Gold & Sovereign G-Sec Yields'}
         </p>
       </div>
 
@@ -255,7 +255,7 @@ export const EarthHeroSection: React.FC<EarthHeroSectionProps> = ({
         <button
           type="button"
           onClick={() => onJumpToSection('supercharts-section')}
-          aria-label="Scroll to Supercharts and Stock Analysis"
+          aria-label="Scroll to Supercharts and Fund Analysis"
           className="p-1.5 rounded-full text-white/75 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
         >
           <ChevronDown className="w-5 h-5" />
@@ -269,7 +269,7 @@ export const EarthHeroSection: React.FC<EarthHeroSectionProps> = ({
             <button
               type="button"
               onClick={() => onJumpToSection('live-terminal')}
-              aria-label="Jump to Stock Analysis Terminal"
+              aria-label="Jump to Fund & Gold Analysis Terminal"
               className="p-2 rounded-full text-[#D1D4DC] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             >
               <Menu className="w-5 h-5" />
