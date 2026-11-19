@@ -41,13 +41,13 @@ export const LandingAccessGateSection: React.FC<LandingAccessGateSectionProps> =
               textWrap: 'balance',
             }}
           >
-            Live Stock Terminal, Heatmaps &amp; 3D Global Stock Exchanges
+            Mutual Funds, Gold, Debt &amp; ETF Terminal + 3D Global Atlas
           </h2>
 
           <p className="text-sm text-[#9598A1] leading-relaxed max-w-xl mb-7">
             {currentUser
-              ? `Welcome back, ${currentUser.name}. Enter your research workspace to inspect live SEC filings, earnings calendars, and the interactive 3D global exchange globe.`
-              : 'Create a free Financia account or log in to unlock the complete research workspace featuring live Form 10-K/10-Q synthesis, sector heatmaps, price alerts, and the 3D global exchange atlas.'}
+              ? `Welcome back, ${currentUser.name}. Enter your research workspace to inspect live AMFI Direct NAVs, Gold BeES & SGBs, Debt yield curves, and the 3D global market hubs.`
+              : 'Create a free Financia account or log in to unlock the full 4-pillar workspace featuring AMFI Direct Mutual Fund NAVs, Spot Gold, Gilt & Corporate Debt yields, D3 AUM heatmaps, and NAV alerts.'}
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -57,7 +57,7 @@ export const LandingAccessGateSection: React.FC<LandingAccessGateSectionProps> =
                 onClick={onEnterFrontend}
                 className="px-6 py-3 rounded-xl bg-[#2962FF] hover:bg-[#1E53E5] text-white text-sm font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
-                <span>Enter Frontend Workspace</span>
+                <span>Enter 4-Pillar Workspace</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             ) : (
@@ -98,7 +98,7 @@ export const LandingAccessGateSection: React.FC<LandingAccessGateSectionProps> =
               Look first / Then leap.
             </div>
             <div className="text-xs text-[#CBD5E1]">
-              SEC EDGAR Synthesis · Multi-Asset Watchlists · 3D Global Atlas
+              AMFI Direct NAVs · Gold &amp; Sovereign Debt · 3D Global Hubs
             </div>
           </div>
         </div>
