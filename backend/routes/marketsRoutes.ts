@@ -1,19 +1,16 @@
-import { Router } from 'express';
+import { Request, Response, Router } from 'express';
 import {
-  CRYPTO_ASSETS,
-  CRYPTO_NEWS,
   FOREX_NEWS,
   FOREX_PERFORMANCE_PAIRS,
   FUTURES_NEWS,
-  INDIAN_STOCKS_NEWS,
+  GOLD_BULLION_ASSETS,
+  GOLD_DEBT_NEWS,
   MACRO_SPARK_ROWS,
   MAJOR_INDICES,
+  MUTUAL_FUND_NEWS,
   TOP_STORIES,
 } from '../../frontend/data/tradingViewData.ts';
-import {
-  computeCompositeMarketSentiment,
-  parseAlternativeMeFng,
-} from '../../frontend/utils/sentimentEngine.ts';
+import { computeCompositeMarketSentiment } from '../../frontend/utils/sentimentEngine.ts';
 import { WireNewsItem } from '../../frontend/types/markets.ts';
 import {
   buildUpcomingEarningsCalendar,
@@ -26,37 +23,21 @@ import {
   setEarningsCache,
   setSentimentCache,
 } from '../services/marketDataService.ts';
-
-function parseLiveCryptoCompareNews(raw: unknown): WireNewsItem[] {
-  if (!raw || typeof raw !== 'object') return [];
-  const data = (raw as { Data?: unknown }).Data;
-  if (!Array.isArray(data)) return [];
-  return data.slice(0, 12).map((row: Record<string, unknown>, idx) => {
-    const published = Number(row.published_on);
-    const diffHours = Number.isFinite(published)
-      ? Math.max(1, Math.round((Date.now() / 1000 - published) / 3600))
-      : 4;
-    const timeAgo = diffHours <= 1 ? '1 hour ago' : `${diffHours} hours ago`;
-    return {
-      id: `cc-live-${String(row.id ?? idx)}`,
-      timeAgo,
-      source: String(row.source_info && typeof row.source_info === 'object'
-        ? (row.source_info as { name?: string }).name || 'CryptoWire'
-        : 'CryptoWire'),
-      headline: String(row.title ?? 'Market update'),
-      summary: String(row.body ?? '').slice(0, 180),
-      category: 'crypto',
-      tickers: ['BTCUSD', 'ETHUSD'],
-    };
-  });
-}
+import { fetchFmpEndpoint } from '../services/etfFmpService.ts';
+import {
+  applyHeatmapTick,
+  buildSectorGroups,
+  calculateRealizedVolatility,
+  HEATMAP_STOCKS,
+  HeatmapMarket,
+} from '../../frontend/utils/heatmapEngine.ts';
 
 export function createMarketsRouter(): Router {
   const router = Router();
 
   router.get('/markets/overview', (_req, res) => {
     res.json({
-      source: process.env.FOREX_API_KEY ? 'live-api' : 'financia-research-engine',
+      source: process.env.FOREX_API_KEY ? 'live-api' : 'financia-4pillar-engine',
       indices: MAJOR_INDICES,
       forexPerformance: FOREX_PERFORMANCE_PAIRS,
       forexNews: FOREX_NEWS,
