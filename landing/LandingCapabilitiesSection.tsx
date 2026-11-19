@@ -118,21 +118,21 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
 
         {/* Asymmetric 12-Column Bento Showcase */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Card 1 (Wide): Multi-Agent SEC Synthesis Live Preview */}
+          {/* Card 1 (Wide): Multi-Pillar Synthesis Live Preview */}
           <div className="lg:col-span-7 rounded-2xl bg-[#0B0F17] border border-[#1E2432] p-6 md:p-7 flex flex-col justify-between">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-5 border-b border-[#1A202C]">
                 <div className="flex items-center gap-2.5">
                   <ShieldCheck className="w-4 h-4 text-[#60A5FA] shrink-0" />
                   <h3 className="font-display font-semibold text-base md:text-lg text-white">
-                    Multi-Agent SEC Filing Synthesis
+                    AMFI Factsheet, Bullion &amp; Debt Yield Synthesis
                   </h3>
                 </div>
 
                 {/* Interactive Ticker Segmented Switcher */}
                 <div
                   role="group"
-                  aria-label="Preview equity filing report"
+                  aria-label="Preview mutual fund, gold, debt fund, or ETF report"
                   className="flex items-center gap-1 p-1 rounded-lg bg-[#06090F] border border-[#1A202C]"
                 >
                   {LANDING_AGENT_SAMPLES.map((sample) => {
@@ -219,14 +219,14 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
             </div>
           </div>
 
-          {/* Card 2 (Right): 3D Global Stock Exchanges Atlas Preview */}
+          {/* Card 2 (Right): 3D Global Market & Bullion Hubs Preview */}
           <div className="lg:col-span-5 rounded-2xl bg-[#0B0F17] border border-[#1E2432] p-6 md:p-7 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between gap-2 pb-4 mb-4 border-b border-[#1A202C]">
                 <div className="flex items-center gap-2.5">
                   <Globe2 className="w-4 h-4 text-[#60A5FA] shrink-0" />
                   <h3 className="font-display font-semibold text-base md:text-lg text-white">
-                    3D Global Exchanges Atlas
+                    3D Fund, ETF &amp; Bullion Hubs
                   </h3>
                 </div>
                 <span className="text-xs font-mono text-[#9598A1] tabular-nums">
@@ -237,7 +237,7 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
               {/* Region Filter Tabs */}
               <div
                 role="group"
-                aria-label="Filter global exchanges by region"
+                aria-label="Filter global fund and bullion hubs by region"
                 className="flex flex-wrap items-center gap-1 mb-4"
               >
                 {(['All', 'Americas', 'Europe', 'Asia-Pacific'] as const).map((region) => (
@@ -295,23 +295,23 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
             </div>
           </div>
 
-          {/* Card 3 (Bottom Left): Cross-Asset Live Telemetry */}
+          {/* Card 3 (Bottom Left): 4-Pillar Asset Coverage */}
           <div className="lg:col-span-5 rounded-2xl bg-[#0B0F17] border border-[#1E2432] p-6 md:p-7 flex flex-col justify-between">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2 pb-4 mb-4 border-b border-[#1A202C]">
                 <div className="flex items-center gap-2.5">
                   <Layers className="w-4 h-4 text-[#60A5FA] shrink-0" />
                   <h3 className="font-display font-semibold text-base md:text-lg text-white">
-                    Cross-Asset Coverage
+                    4-Pillar Coverage
                   </h3>
                 </div>
 
                 <div
                   role="group"
                   aria-label="Select asset class preview"
-                  className="flex items-center gap-1"
+                  className="flex flex-wrap items-center gap-1"
                 >
-                  {(['Indices', 'Forex', 'Crypto', 'Futures'] as AssetPreviewTab[]).map((tab) => (
+                  {(['ETFs', 'Gold', 'Debt Funds', 'Mutual Funds', 'Forex'] as AssetPreviewTab[]).map((tab) => (
                     <button
                       key={tab}
                       type="button"
@@ -374,14 +374,14 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
             </div>
           </div>
 
-          {/* Card 4 (Bottom Right Wide): Sector Momentum & Breadth */}
+          {/* Card 4 (Bottom Right Wide): 4-Pillar Allocation Momentum & Alerts */}
           <div className="lg:col-span-7 rounded-2xl bg-[#0B0F17] border border-[#1E2432] p-6 md:p-7 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between gap-3 pb-4 mb-5 border-b border-[#1A202C]">
                 <div className="flex items-center gap-2.5">
                   <TrendingUp className="w-4 h-4 text-[#60A5FA] shrink-0" />
                   <h3 className="font-display font-semibold text-base md:text-lg text-white">
-                    Sector Momentum &amp; Target Alerts
+                    4-Pillar Allocation &amp; NAV Alerts
                   </h3>
                 </div>
                 <span className="text-xs font-mono text-[#9598A1]">24h Relative Flow</span>
@@ -427,7 +427,7 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
 
             <div className="pt-4 mt-6 border-t border-[#1A202C] flex flex-wrap items-center justify-between gap-4">
               <span className="text-xs text-[#9598A1]">
-                Real-time sector heatmaps &amp; instant price-threshold alerts inside workspace
+                Real-time 4-pillar AUM heatmaps &amp; instant NAV/spot price alerts inside workspace
               </span>
               <button
                 type="button"
