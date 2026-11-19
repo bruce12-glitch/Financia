@@ -579,33 +579,36 @@ export default function App() {
           />
 
           <main id="frontend-section" data-testid="frontend-workspace" className="flex-1">
-            {/* 1. Financia Multi-Agent Stock Analysis Terminal & SEC Filing Synthesis */}
+            {/* 1. Financia Multi-Agent Mutual Fund, Gold, Debt & ETF Analysis Terminal */}
             <LiveStockTerminal
               stocks={stocks}
               selectedTicker={selectedTicker}
-              onSelectTicker={setSelectedTicker}
+              onSelectTicker={handleSelectPrimaryTicker}
               onAnalyzeCustomTicker={handleAnalyzeCustomTicker}
               liveFeedActive={liveFeedActive}
               onToggleLiveFeed={() => setLiveFeedActive((prev) => !prev)}
               alerts={alerts}
+              comparisonTickers={comparisonTickers}
+              onComparisonTickersChange={handleComparisonTickersChange}
               onOpenSetAlert={(stock) =>
                 setAlertTarget({
                   ticker: stock.ticker,
                   name: stock.name,
                   currentPrice: stock.price,
-                  unit: 'USD',
+                  unit: stock.currencyUnit || 'INR',
                 })
               }
             />
 
-            {/* 2. Market Summary, Indices, Crypto Dominance, Macro, Featured IPOs, Ideas & Top Stories */}
+            {/* 2. Market Summary, ETFs, Gold Allocation, Debt Yields, NFOs & Top Stories */}
             <MarketSummaryAndIdeas
               onSelectSymbol={setSelectedSymbol}
               onSelectNews={setSelectedNews}
               onSelectIdea={setSelectedIdea}
+              liveFeedActive={liveFeedActive}
             />
 
-            {/* 3. Indian Stocks, Crypto, Energy & Metals Futures, Forex Performance, Forex News & Economy */}
+            {/* 3. Direct Mutual Funds, Gold & Bullion, Debt Funds, FX Hedging & Macro Inflation */}
             <MarketsSections
               onSelectSymbol={setSelectedSymbol}
               onSelectNews={setSelectedNews}
@@ -614,7 +617,7 @@ export default function App() {
               onJumpToAnalysis={handleOpenInTerminal}
             />
 
-            {/* 4. Interactive 3D Global Stock Exchanges Explorer Globe (Authenticated Frontend Section) */}
+            {/* 4. Interactive 3D Global Fund, ETF & Bullion Hubs Explorer Globe */}
             <GlobalExchangesGlobeSection onJumpToAnalysis={handleOpenInTerminal} />
           </main>
         </>
@@ -700,7 +703,11 @@ export default function App() {
               Price Alert Triggered · {triggeredBanner.ticker}
             </div>
             <div className="text-[#CBD5E1] mt-0.5 tabular-nums">
-              Crossed {triggeredBanner.condition} ${triggeredBanner.targetPrice.toFixed(2)}
+              Crossed {triggeredBanner.condition}{' '}
+              {(stocks.find((s) => s.ticker === triggeredBanner.ticker)?.currencyUnit || 'INR') === 'USD'
+                ? '$'
+                : '₹'}
+              {triggeredBanner.targetPrice.toFixed(2)}
             </div>
           </div>
           <button
