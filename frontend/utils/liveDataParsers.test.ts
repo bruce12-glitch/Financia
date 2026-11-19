@@ -4,32 +4,38 @@ import { INITIAL_STOCKS } from '../data/marketData';
 import {
   mergeFinnhubQuote,
   parseAlphaVantageDaily,
+  parseAmfiMfNav,
+  parseApiNinjasEtfDetail,
   parseBinanceKlines,
-  parseSecCompanyFacts,
+  parseFmpQuoteAndHistory,
+  parseFmpTreasuryRates,
+  parseMarketstackEod,
+  parseMfnavFundDetail,
+  parseTwelveDataTimeSeries,
 } from './liveDataParsers';
 
-test('parseBinanceKlines maps valid kline arrays into SuperchartCandle objects', () => {
+test('parseBinanceKlines maps PAXGUSDT spot gold klines into SuperchartCandle objects', () => {
   const sample = [
-    [1700000000000, '64100.50', '64450.00', '63950.25', '64320.10', '128.45'],
-    [1700003600000, '64320.10', '64600.00', '64200.00', '64510.75', '94.12'],
+    [1700000000000, '3240.50', '3255.00', '3235.25', '3251.10', '428.45'],
+    [1700003600000, '3251.10', '3272.00', '3248.00', '3268.75', '394.12'],
   ];
   const parsed = parseBinanceKlines(sample);
   assert.equal(parsed.length, 2);
-  assert.equal(parsed[0].open, 64100.5);
-  assert.equal(parsed[1].close, 64510.75);
+  assert.equal(parsed[0].open, 3240.5);
+  assert.equal(parsed[1].close, 3268.75);
   assert.match(parsed[0].time, /^\d{2}:\d{2}$/);
 });
 
-test('mergeFinnhubQuote overlays valid Finnhub price & delta cleanly', () => {
-  const base = INITIAL_STOCKS[0];
-  const merged = mergeFinnhubQuote({ c: 192.45, d: 4.15, dp: 2.21, pc: 188.3 }, base);
-  assert.equal(merged.price, 192.45);
-  assert.equal(merged.change, 4.15);
-  assert.equal(merged.changePercent, 2.21);
+test('mergeFinnhubQuote overlays valid ETF quote price & delta cleanly', () => {
+  const base = INITIAL_STOCKS[0]; // GOLDBEES
+  const merged = mergeFinnhubQuote({ c: 309.45, d: 3.05, dp: 1.0, pc: 306.4 }, base);
+  assert.equal(merged.price, 309.45);
+  assert.equal(merged.change, 3.05);
+  assert.equal(merged.changePercent, 1.0);
   assert.equal(merged.dataSource, 'Finnhub Live Quote');
 });
 
-test('parseAlphaVantageDaily extracts OHLCV series and overview metadata for IBM', () => {
+test('parseAlphaVantageDaily extracts ETF OHLCV series and overview metadata for GLD', () => {
   const base = INITIAL_STOCKS[0];
   const daily = {
     'Time Series (Daily)': {
