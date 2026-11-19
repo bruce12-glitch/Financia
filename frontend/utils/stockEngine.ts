@@ -454,76 +454,386 @@ export function synthesizeCustomTickerReport(ticker: string, existingStocks: Sto
     },
     deep_insights: [
       {
-        title: '10-Q Gross Margin Expansion Trajectory',
-        description: `Gross margin improved to ${quarters[3].gross_margin}% in Q1 26 as higher-margin software and analytics recurring streams outpaced hardware overhead.`,
-        category: 'Fundamental',
+        title: `${terVal.toFixed(2)}% Direct Expense Ratio Advantage`,
+        description: `Low management fee structure preserves an estimated ${Math.round(95 - terVal * 20)} bps of annual net compounding versus retail regular plans.`,
+        category: 'Factsheet & AMFI',
         impact_score: 9,
       },
       {
-        title: 'Dark Pool & Block Flow Accumulation',
-        description: `Institutional block prints above the 20-day VWAP ($${Number((basePrice * 0.97).toFixed(2))}) indicate systematic institutional absorption on intraday pullbacks.`,
-        category: 'Options & Flow',
+        title: `${meta.assetClass} Liquidity & Tracking Precision`,
+        description: `Observed spread stability (${durationOrTracking}) confirms clean execution near daily NAV / iNAV fair value (${pricePrefix}${basePrice.toFixed(2)}).`,
+        category: meta.assetClass === 'Debt Fund' ? 'Yield & Duration' : 'Fund Flow',
         impact_score: 8,
-      },
-      {
-        title: 'Form 4 Executive Holding Stability',
-        description: 'Zero unscheduled insider dispositions outside pre-arranged 10b5-1 plans over the past two quarters.',
-        category: 'Insider & SEC',
-        impact_score: 7,
       },
     ],
     findings: [
       {
-        documentType: `Form 10-Q (Quarterly Report — ${normalized})`,
-        date: '2026-05-14',
-        sourceUrl: `https://www.sec.gov/edgar/searchedgar/companysearch`,
+        documentType: `AMFI / Scheme Information Document (SID — ${normalized})`,
+        date: '2026-06-15',
+        sourceUrl: meta.amfiCode ? `https://api.mfapi.in/mf/${meta.amfiCode}` : 'https://www.amfiindia.com/',
         keyInsights: [
-          `Quarterly revenue recorded at $${quarters[3].revenue}B (+18.4% YoY), surpassing consensus estimates by 310 bps.`,
-          `Cash, cash equivalents, and marketable securities totaled $${Number((quarters[3].revenue * 1.45).toFixed(2))}B with zero near-term debt maturities.`,
-        ],
-      },
-      {
-        documentType: `Form 8-K (Material Current Event — ${normalized})`,
-        date: '2026-06-02',
-        sourceUrl: `https://www.sec.gov/edgar/searchedgar/companysearch`,
-        keyInsights: [
-          'Board of Directors authorized an incremental $2.5B share repurchase program effective immediately.',
-          'Reaffirmed full-year operating margin guidance and updated multi-region cloud infrastructure deployment milestones.',
+          `Verified Total Expense Ratio: ${terVal.toFixed(2)}%; Benchmark metric: ${ytmOrCagr}.`,
+          `Risk & Custody parameter: ${durationOrTracking} across trailing 12M disclosures.`,
         ],
       },
     ],
     podcast_script: [
       {
-        speaker: 'Lead Quant (Kore)',
-        line: `Welcome to the Financia Intelligence Briefing for ${normalized}. Looking at the live tape at ${formatCurrency(basePrice)}, our multi-agent committee scored ${normalized} at ${conviction} out of 100.`,
+        speaker: 'Fund Quant (Kore)',
+        line: `Welcome to the Financia 4-Pillar Briefing for ${normalized}. Trading at ${pricePrefix}${basePrice.toFixed(2)}, our model scores ${normalized} at ${conviction} out of 100.`,
       },
       {
-        speaker: 'SEC Strategist (Aoede)',
-        line: `That conviction comes straight from the latest Form 10-Q and 8-K filings. Quarterly revenue scaled to $${quarters[3].revenue} billion while net income hit $${quarters[3].net_income} billion, paired with a fresh share repurchase authorization.`,
-      },
-      {
-        speaker: 'Lead Quant (Kore)',
-        line: `On the technical and options surface, 20-day moving average support holds firmly near ${formatCurrency(basePrice * 0.96)}, making pullbacks high-probability institutional accumulation zones.`,
+        speaker: 'Fixed-Income Desk (Aoede)',
+        line: `With a ${terVal.toFixed(2)}% expense ratio and ${ytmOrCagr}, ${normalized} fits cleanly inside a diversified Mutual Fund, Gold, Debt, and ETF core.`,
       },
     ],
   };
 
   return {
     ticker: normalized,
-    name: `${normalized} Global Holdings`,
-    sector: 'Mega-Cap Tech',
+    name: meta.displayName,
+    sector: meta.sector,
+    assetClass: meta.assetClass,
+    currencyUnit: meta.currencyUnit,
     price: basePrice,
     change: changeVal,
     changePercent: changePct,
-    volume: `${24 + (hash % 40)}.4M`,
-    marketCap: `$${140 + (hash % 650)}B`,
-    peRatio: Number((21.5 + (hash % 24)).toFixed(1)),
+    volume: `${14 + (hash % 32)}.2M`,
+    marketCap: `$${quarters[3].revenue}B AUM`,
+    aum: `$${quarters[3].revenue}B`,
+    peRatio: terVal,
+    expenseRatio: `${terVal.toFixed(2)}% TER`,
+    ytmOrCagr,
+    modifiedDuration: durationOrTracking,
+    creditRating: meta.assetClass === 'Debt Fund' ? 'AAA / Sovereign' : meta.assetClass === 'Gold Bullion' ? '995 Fine Vaulted' : 'Direct Growth',
+    amfiSchemeCode: meta.amfiCode,
     rsi14: calculateRSI(series.map((p) => p.price)),
-    ivRank: 32 + (hash % 48),
+    ivRank: 18 + (hash % 30),
     convictionScore: conviction,
-    shortInterest: `${(1.2 + (hash % 35) / 10).toFixed(1)}%`,
-    institutionalOwnership: `${68 + (hash % 24)}.4%`,
-    nextEarnings: 'Jul 28, 2026',
+    shortInterest: durationOrTracking,
+    institutionalOwnership: `$${quarters[3].revenue}B AUM`,
+    nextEarnings: meta.assetClass === 'Debt Fund' ? 'RBI MPC Policy' : 'AMFI Monthly Factsheet',
     report,
   };
 }
+
+export interface ThirtyDayPricePoint {
+  dayIndex: number;
+  isoDate: string;
+  dateLabel: string;
+  price: number;
+  open: number;
+  high: number;
+  low: number;
+  volume: number;
+  changePctFromStart: number;
+  dailyChangePct: number;
+}
+
+export interface ThirtyDayPerformanceSummary {
+  startPrice: number;
+  endPrice: number;
+  returnPct: number;
+  periodHigh: number;
+  periodLow: number;
+  avgVolume: number;
+}
+
+const MONTH_SHORT_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+function formatUtcShortDate(ms: number): { isoDate: string; dateLabel: string } {
+  const d = new Date(ms);
+  const year = d.getUTCFullYear();
+  const monthIdx = d.getUTCMonth();
+  const day = d.getUTCDate();
+  const mm = String(monthIdx + 1).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  return {
+    isoDate: `${year}-${mm}-${dd}`,
+    dateLabel: `${MONTH_SHORT_NAMES[monthIdx]} ${dd}`,
+  };
+}
+
+/**
+ * Generates a deterministic, 30-day daily historical performance series for any selected ticker,
+ * smoothly interpolating the trailing month of `stock_price_4m` and anchoring day 30 on `currentPrice`.
+ */
+export function buildThirtyDayPerformanceSeries(
+  baseSeries: PricePoint[],
+  currentPrice: number,
+  ticker: string,
+  anchorIsoDate = '2026-06-20'
+): ThirtyDayPricePoint[] {
+  const days = 30;
+  const safeCurrent = Math.max(0.01, Number.isFinite(currentPrice) ? currentPrice : 100);
+  const normalizedTicker = ticker.trim().toUpperCase() || 'FIN';
+
+  let seed = 0;
+  for (let i = 0; i < normalizedTicker.length; i++) {
+    seed = (seed * 31 + normalizedTicker.charCodeAt(i)) % 10000;
+  }
+
+  const tailWindow = baseSeries.length >= 4
+    ? baseSeries.slice(-4)
+    : baseSeries.length > 0
+      ? baseSeries
+      : [{
+          date: anchorIsoDate,
+          price: safeCurrent,
+          open: safeCurrent * 0.99,
+          high: safeCurrent * 1.01,
+          low: safeCurrent * 0.985,
+          volume: 28,
+        }];
+
+  const baseVolumes = tailWindow.map((p) => Math.max(1, p.volume || 20));
+  const avgTailVol = baseVolumes.reduce((acc, v) => acc + v, 0) / baseVolumes.length;
+
+  // Normalize backbone so the final point ends cleanly at `safeCurrent`
+  const lastBackbonePrice = Math.max(0.01, tailWindow[tailWindow.length - 1].price);
+  const scaleFactor = safeCurrent / lastBackbonePrice;
+
+  const anchorMs = Date.parse(`${anchorIsoDate}T00:00:00Z`);
+  const safeAnchorMs = Number.isNaN(anchorMs) ? Date.UTC(2026, 5, 20) : anchorMs;
+  const dayMs = 86_400_000;
+
+  const rawPrices: number[] = [];
+  for (let i = 0; i < days; i++) {
+    const t = i / (days - 1);
+    const backboneFloat = t * (tailWindow.length - 1);
+    const loIdx = Math.min(tailWindow.length - 1, Math.floor(backboneFloat));
+    const hiIdx = Math.min(tailWindow.length - 1, loIdx + 1);
+    const frac = backboneFloat - loIdx;
+    const interpolated =
+      tailWindow[loIdx].price * (1 - frac) + tailWindow[hiIdx].price * frac;
+
+    const scaled = interpolated * scaleFactor;
+    // Envelope vanishes smoothly on final day so final close matches live `currentPrice`
+    const envelope = Math.sin(t * Math.PI);
+    const microWave =
+      (Math.sin(i * 0.72 + (seed % 7)) * 0.011 +
+        Math.cos(i * 1.37 + (seed % 11)) * 0.0065) *
+      envelope;
+
+    const priceVal =
+      i === days - 1
+        ? safeCurrent
+        : Math.max(0.01, scaled * (1 + microWave));
+    rawPrices.push(Number(priceVal.toFixed(2)));
+  }
+
+  const startPrice = rawPrices[0];
+
+  return rawPrices.map((price, idx) => {
+    const prevPrice = idx === 0 ? price : rawPrices[idx - 1];
+    const open =
+      idx === 0
+        ? Number((price * (1 - ((seed % 5) - 2) * 0.0025)).toFixed(2))
+        : prevPrice;
+    const spreadRatio = 0.006 + ((seed + idx * 13) % 9) * 0.0014;
+    const high = Number((Math.max(open, price) * (1 + spreadRatio)).toFixed(2));
+    const low = Number(Math.max(0.01, Math.min(open, price) * (1 - spreadRatio * 0.9)).toFixed(2));
+    const volume = Math.max(
+      1,
+      Math.round(avgTailVol * (0.78 + ((seed + idx * 17) % 11) * 0.045))
+    );
+
+    const dayOffset = days - 1 - idx;
+    const { isoDate, dateLabel } = formatUtcShortDate(safeAnchorMs - dayOffset * dayMs);
+
+    const changePctFromStart =
+      startPrice > 0 ? Number((((price - startPrice) / startPrice) * 100).toFixed(2)) : 0;
+    const dailyChangePct =
+      idx === 0 || prevPrice <= 0
+        ? 0
+        : Number((((price - prevPrice) / prevPrice) * 100).toFixed(2));
+
+    return {
+      dayIndex: idx + 1,
+      isoDate,
+      dateLabel,
+      price,
+      open,
+      high,
+      low,
+      volume,
+      changePctFromStart,
+      dailyChangePct,
+    };
+  });
+}
+
+/**
+ * Computes summary statistics across a 30-day performance series.
+ */
+export function summarizeThirtyDayPerformance(
+  series: ThirtyDayPricePoint[]
+): ThirtyDayPerformanceSummary {
+  if (!series || series.length === 0) {
+    return {
+      startPrice: 0,
+      endPrice: 0,
+      returnPct: 0,
+      periodHigh: 0,
+      periodLow: 0,
+      avgVolume: 0,
+    };
+  }
+
+  const startPrice = series[0].price;
+  const endPrice = series[series.length - 1].price;
+  const returnPct =
+    startPrice > 0 ? Number((((endPrice - startPrice) / startPrice) * 100).toFixed(2)) : 0;
+  const periodHigh = Number(Math.max(...series.map((p) => p.high)).toFixed(2));
+  const periodLow = Number(Math.min(...series.map((p) => p.low)).toFixed(2));
+  const avgVolume = Number(
+    (series.reduce((sum, p) => sum + p.volume, 0) / series.length).toFixed(1)
+  );
+
+  return {
+    startPrice,
+    endPrice,
+    returnPct,
+    periodHigh,
+    periodLow,
+    avgVolume,
+  };
+}
+
+export const COMPARISON_SERIES_COLORS = [
+  '#2962FF', // Primary Cobalt Blue
+  '#089981', // Emerald Green
+  '#D97706', // Amber
+  '#7C3AED', // Violet
+  '#DB2777', // Crimson Rose
+] as const;
+
+export interface ComparisonPoint {
+  date: string;
+  price: number;
+  pctReturn: number;
+  volume: number;
+}
+
+export interface ComparisonTickerSeries {
+  ticker: string;
+  name: string;
+  color: string;
+  isPrimary: boolean;
+  spotPrice: number;
+  startPrice: number;
+  periodReturnPct: number;
+  points: ComparisonPoint[];
+  rsiSeries: (number | null)[];
+}
+
+export interface MultiTickerComparisonResult {
+  dates: string[];
+  tickers: ComparisonTickerSeries[];
+  minPct: number;
+  maxPct: number;
+  effectiveRsiPeriod: number;
+}
+
+/**
+ * Aligns a primary ticker and zero or more secondary tickers across a selected timeframe,
+ * normalizing each series to cumulative percentage return from period start for side-by-side comparison,
+ * while also computing each ticker's rolling RSI series.
+ */
+export function buildMultiTickerComparisonSeries(
+  primary: StockQuote,
+  secondaryStocks: StockQuote[],
+  timeframe: '1D' | '1W' | '1M' | '4M' | '1Y',
+  rsiPeriod = 4
+): MultiTickerComparisonResult {
+  const seen = new Set<string>();
+  const orderedQuotes: { quote: StockQuote; isPrimary: boolean }[] = [];
+
+  const primarySymbol = primary.ticker.toUpperCase();
+  seen.add(primarySymbol);
+  orderedQuotes.push({ quote: primary, isPrimary: true });
+
+  for (const sec of secondaryStocks) {
+    const sym = sec.ticker.toUpperCase();
+    if (!seen.has(sym)) {
+      seen.add(sym);
+      orderedQuotes.push({ quote: sec, isPrimary: false });
+    }
+  }
+
+  const primaryRaw = getSeriesForTimeframe(
+    primary.report.financial_charts.stock_price_4m,
+    timeframe
+  );
+  const dates = primaryRaw.map((p) => p.date);
+  const effectiveRsiPeriod = getEffectiveRSIPeriod(primaryRaw.length, rsiPeriod);
+
+  let rawMinPct = 0;
+  let rawMaxPct = 0;
+
+  const tickers: ComparisonTickerSeries[] = orderedQuotes.map(({ quote, isPrimary }, idx) => {
+    const tfSeries = getSeriesForTimeframe(
+      quote.report.financial_charts.stock_price_4m,
+      timeframe
+    );
+    const aligned = dates.map((d, ptIdx) => {
+      const match = tfSeries[ptIdx] || tfSeries[tfSeries.length - 1] || {
+        date: d,
+        price: quote.price,
+        open: quote.price,
+        high: quote.price,
+        low: quote.price,
+        volume: 10,
+      };
+      return match;
+    });
+
+    const startPrice = aligned.length > 0 && aligned[0].price > 0 ? aligned[0].price : quote.price;
+    const points: ComparisonPoint[] = aligned.map((pt) => {
+      const pctReturn =
+        startPrice > 0
+          ? Number((((pt.price - startPrice) / startPrice) * 100).toFixed(2))
+          : 0;
+      if (pctReturn < rawMinPct) rawMinPct = pctReturn;
+      if (pctReturn > rawMaxPct) rawMaxPct = pctReturn;
+      return {
+        date: pt.date,
+        price: pt.price,
+        pctReturn,
+        volume: pt.volume,
+      };
+    });
+
+    const periodReturnPct = points.length > 0 ? points[points.length - 1].pctReturn : 0;
+    const rsiSeries = calculateRSISeries(
+      points.map((p) => p.price),
+      effectiveRsiPeriod
+    );
+
+    return {
+      ticker: quote.ticker.toUpperCase(),
+      name: quote.name,
+      color: COMPARISON_SERIES_COLORS[idx % COMPARISON_SERIES_COLORS.length],
+      isPrimary,
+      spotPrice: quote.price,
+      startPrice,
+      periodReturnPct,
+      points,
+      rsiSeries,
+    };
+  });
+
+  const span = Math.max(2, rawMaxPct - rawMinPct);
+  const pad = span * 0.14;
+  return {
+    dates,
+    tickers,
+    minPct: Number((rawMinPct - pad).toFixed(2)),
+    maxPct: Number((rawMaxPct + pad).toFixed(2)),
+    effectiveRsiPeriod,
+  };
+}
+
