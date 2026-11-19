@@ -6,7 +6,7 @@ import {
   latLngToCartesian,
 } from './globalExchanges';
 
-test('GLOBAL_STOCK_EXCHANGES includes BVC Caracas Stock Exchange and major global hubs', () => {
+test('GLOBAL_STOCK_EXCHANGES includes BVC, NSE, NYSE, LSE, and exclusively Fund/Gold/Debt/ETF instruments', () => {
   const codes = new Set(GLOBAL_STOCK_EXCHANGES.map((e) => e.code));
   assert.ok(codes.has('BVC'));
   assert.ok(codes.has('NYSE'));
@@ -14,6 +14,7 @@ test('GLOBAL_STOCK_EXCHANGES includes BVC Caracas Stock Exchange and major globa
   assert.ok(codes.has('LSE'));
   assert.ok(codes.has('TSE'));
   assert.ok(GLOBAL_STOCK_EXCHANGES.length >= 18);
+  assert.ok(GLOBAL_STOCK_EXCHANGES.every((e) => !e.instruments.includes('Stocks')));
 });
 
 test('latLngToCartesian places prime meridian equator at +Z and north pole at +Y', () => {
