@@ -270,65 +270,118 @@ export function getSeriesForTimeframe(
     return {
       date: d,
       price: p,
-      open: Number((p * 0.99).toFixed(2)),
-      high: Number((p * 1.015).toFixed(2)),
-      low: Number((p * 0.985).toFixed(2)),
+      open: Number((p * 0.994).toFixed(2)),
+      high: Number((p * 1.01).toFixed(2)),
+      low: Number((p * 0.99).toFixed(2)),
       volume: Math.round(firstPoint.volume * (0.85 + (i % 2) * 0.2)),
     };
   });
   return [...prefix, ...baseSeries];
 }
 
+function classifyPillarFromTicker(normalized: string): {
+  sector: StockQuote['sector'];
+  assetClass: NonNullable<StockQuote['assetClass']>;
+  displayName: string;
+  currencyUnit: 'INR' | 'USD';
+  amfiCode?: string;
+} {
+  if (/GOLD|PAXG|XAU|SGB|SILVER|^GLD$|^IAU$/.test(normalized)) {
+    return {
+      sector: 'Gold & Bullion',
+      assetClass: 'Gold Bullion',
+      displayName: `${normalized} Physical Bullion Trust`,
+      currencyUnit: normalized === 'GLD' || normalized === 'IAU' || normalized === 'PAXGUSDT' || normalized === 'XAUUSD' ? 'USD' : 'INR',
+    };
+  }
+  if (/GILT|BOND|CORP|LIQUID|AGG|TLT|BND|DEBT|SHORT|DURATION/.test(normalized)) {
+    return {
+      sector: 'Debt Funds',
+      assetClass: 'Debt Fund',
+      displayName: `${normalized} Fixed-Income Direct Fund`,
+      currencyUnit: normalized === 'AGG' || normalized === 'TLT' || normalized === 'BND' ? 'USD' : 'INR',
+      amfiCode: normalized === 'SBIGILT' ? '119823' : normalized === 'HDFCCORP' ? '128053' : undefined,
+    };
+  }
+  if (/BEES|SPY|QQQ|VTI|VOO|INDA|ETF|M100|EWG|EWJ/.test(normalized)) {
+    return {
+      sector: 'ETFs',
+      assetClass: 'ETF',
+      displayName: `${normalized} Index Benchmark ETF`,
+      currencyUnit: /SPY|QQQ|VTI|VOO|INDA|EWG|EWJ/.test(normalized) ? 'USD' : 'INR',
+    };
+  }
+  return {
+    sector: 'Mutual Funds',
+    assetClass: 'Mutual Fund',
+    displayName: `${normalized} Direct Growth Mutual Fund`,
+    currencyUnit: 'INR',
+    amfiCode:
+      normalized === 'PPFAS'
+        ? '122639'
+        : normalized === 'HDFCMID'
+        ? '118989'
+        : normalized === 'QUANTSC'
+        ? '120828'
+        : normalized === 'UTI50'
+        ? '120716'
+        : undefined,
+  };
+}
+
 /**
- * Synthesizes a complete, deterministic institutional ReportData object for any custom ticker symbol
- * if the ticker is not already in the preset list.
+ * Synthesizes a complete, deterministic 4-pillar fund/gold/debt/ETF ReportData object
+ * for any custom symbol if not already in the preset list.
  */
 export function synthesizeCustomTickerReport(ticker: string, existingStocks: StockQuote[]): StockQuote {
   const normalized = ticker.trim().toUpperCase();
   const found = existingStocks.find((s) => s.ticker.toUpperCase() === normalized);
   if (found) return found;
 
-  // Deterministic seed from ticker characters
   let hash = 0;
   for (let i = 0; i < normalized.length; i++) {
     hash = (hash * 31 + normalized.charCodeAt(i)) % 10000;
   }
 
-  const basePrice = Number((65 + (hash % 420) + (hash % 99) / 100).toFixed(2));
-  const changePct = Number((((hash % 74) - 28) / 10).toFixed(2));
+  const meta = classifyPillarFromTicker(normalized);
+  const basePrice =
+    meta.assetClass === 'Debt Fund'
+      ? Number((32 + (hash % 65) + (hash % 99) / 100).toFixed(2))
+      : Number((68 + (hash % 280) + (hash % 99) / 100).toFixed(2));
+  const changePct = Number((((hash % 46) - 12) / 10).toFixed(2));
   const changeVal = Number(((basePrice * changePct) / 100).toFixed(2));
-  const conviction = 64 + (hash % 31);
+  const conviction = 72 + (hash % 23);
 
   const dates = [
     'Feb 15', 'Feb 28', 'Mar 10', 'Mar 22', 'Apr 03', 'Apr 15',
-    'Apr 27', 'May 08', 'May 19', 'May 30', 'Jun 10', 'Jun 20'
+    'Apr 27', 'May 08', 'May 19', 'May 30', 'Jun 10', 'Jun 20',
   ];
 
   const series: PricePoint[] = dates.map((date, idx) => {
     const progress = idx / (dates.length - 1);
-    const startP = basePrice * (changePct >= 0 ? 0.86 : 1.12);
-    const wave = Math.sin(idx * 1.1 + (hash % 5)) * (basePrice * 0.022);
+    const startP = basePrice * (changePct >= 0 ? 0.91 : 1.06);
+    const wave = Math.sin(idx * 1.1 + (hash % 5)) * (basePrice * (meta.assetClass === 'Debt Fund' ? 0.004 : 0.015));
     const price = Number((startP + (basePrice - startP) * progress + (idx === dates.length - 1 ? 0 : wave)).toFixed(2));
     return {
       date,
       price,
-      open: Number((price * 0.992).toFixed(2)),
-      high: Number((price * 1.016).toFixed(2)),
-      low: Number((price * 0.984).toFixed(2)),
-      volume: 18 + ((hash + idx * 7) % 45),
+      open: Number((price * 0.996).toFixed(2)),
+      high: Number((price * 1.008).toFixed(2)),
+      low: Number((price * 0.992).toFixed(2)),
+      volume: 12 + ((hash + idx * 5) % 28),
     };
   });
 
-  const qRevBase = Number((4.2 + (hash % 28) * 0.8).toFixed(1));
+  const qAumBase = Number((5.4 + (hash % 24) * 0.9).toFixed(1));
   const quarters = ['Q2 25', 'Q3 25', 'Q4 25', 'Q1 26'].map((q, idx) => {
-    const rev = Number((qRevBase * (1 + idx * 0.06)).toFixed(2));
-    const net = Number((rev * (0.18 + (idx % 2) * 0.03)).toFixed(2));
+    const aumB = Number((qAumBase * (1 + idx * 0.07)).toFixed(2));
+    const netInflow = Number((aumB * (0.09 + (idx % 2) * 0.03)).toFixed(2));
     return {
       quarter: q,
-      revenue: rev,
-      net_income: net,
-      eps: Number((net / 2.4).toFixed(2)),
-      gross_margin: Number((54.2 + idx * 1.1).toFixed(1)),
+      revenue: aumB,
+      net_income: netInflow,
+      eps: Number((6.8 + (hash % 14) * 0.6 + idx * 0.25).toFixed(2)),
+      gross_margin: meta.assetClass === 'Debt Fund' ? 99.5 : 99.2,
     };
   });
 
