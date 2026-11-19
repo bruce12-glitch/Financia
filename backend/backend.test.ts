@@ -282,3 +282,145 @@ test('Backend Auth, Alerts CRUD, Watchlist Persistence & Inquiry validation work
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        name: 'Ananya Rao',
+        email: 'ananya@financia.io',
+        password: 'StrongPassword9!',
+      }),
+    });
+    assert.equal(dupRes.status, 409);
+
+    // 4. Watchlist update persists to JSON database
+    const putWatch = await fetch(`${baseUrl}/api/watchlist`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${regData.token}`,
+      },
+      body: JSON.stringify({
+        primaryTicker: 'PPFAS',
+        comparisonTickers: ['SBIGILT', 'GOLDBEES'],
+      }),
+    });
+    assert.equal(putWatch.status, 200);
+    const watchJson = (await putWatch.json()) as {
+      watchlist: { primaryTicker: string; comparisonTickers: string[] };
+    };
+    assert.equal(watchJson.watchlist.primaryTicker, 'PPFAS');
+    assert.deepEqual(watchJson.watchlist.comparisonTickers, ['SBIGILT', 'GOLDBEES']);
+
+    // Verify file persistence directly via fresh store read
+    const reloadedStore = createPersistenceStore(dbPath);
+    assert.equal(reloadedStore.getUserWatchlist(regData.user.id).primaryTicker, 'PPFAS');
+
+    // 5. Price alert CRUD for GOLDBEES
+    const createAlert = await fetch(`${baseUrl}/api/alerts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${regData.token}`,
+      },
+      body: JSON.stringify({
+        ticker: 'GOLDBEES',
+        companyName: 'Nippon India ETF Gold BeES',
+        targetPrice: 80.5,
+        currentPriceAtSet: 74.85,
+        condition: 'above',
+        note: 'LBMA spot breakout check',
+      }),
+    });
+    assert.equal(createAlert.status, 201);
+    const createdJson = (await createAlert.json()) as { alert: { id: string; ticker: string } };
+    assert.equal(createdJson.alert.ticker, 'GOLDBEES');
+
+    const patchAlert = await fetch(`${baseUrl}/api/alerts/${createdJson.alert.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${regData.token}`,
+      },
+      body: JSON.stringify({ notificationsEnabled: false }),
+    });
+    assert.equal(patchAlert.status, 200);
+    const patchedJson = (await patchAlert.json()) as { alert: { notificationsEnabled: boolean } };
+    assert.equal(patchedJson.alert.notificationsEnabled, false);
+
+    const delAlert = await fetch(`${baseUrl}/api/alerts/${createdJson.alert.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${regData.token}` },
+    });
+    assert.equal(delAlert.status, 200);
+
+    // 6. Inquiry validation
+    const badInq = await fetch(`${baseUrl}/api/inquiries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'A',
+        email: 'not-an-email',
+        phone: '123',
+        message: 'hi',
+      }),
+    });
+    assert.equal(badInq.status, 400);
+
+    const goodInq = await fetch(`${baseUrl}/api/inquiries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Ananya Rao',
+        email: 'ananya@financia.io',
+        phone: '+919876543210',
+        message: 'Requesting institutional Gilt vs Corporate Bond duration modeling.',
+      }),
+    });
+    assert.equal(goodInq.status, 201);
+
+    // 7. Logout revokes token
+    const logoutRes = await fetch(`${baseUrl}/api/auth/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${regData.token}` },
+    });
+    assert.equal(logoutRes.status, 200);
+
+    const meAfterLogout = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${regData.token}` },
+    });
+    const meJson = (await meAfterLogout.json()) as { authenticated: boolean };
+    assert.equal(meJson.authenticated, false);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('Backend AI routes validate inputs and return 503 cleanly without mock fallback when GEMINI_API_KEY is unset', async () => {
+  const prevKey = process.env.GEMINI_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+  const { baseUrl, cleanup } = await startTestServer();
+
+  try {
+    const statusRes = await fetch(`${baseUrl}/api/ai/status`);
+    assert.equal(statusRes.status, 200);
+    const statusJson = (await statusRes.json()) as { configured: boolean; model: string };
+    assert.equal(statusJson.configured, false);
+    assert.equal(statusJson.model, 'gemini-4-hydrogen');
+
+    const badTickerRes = await fetch(`${baseUrl}/api/ai/research`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker: 'INVALID$$' }),
+    });
+    assert.equal(badTickerRes.status, 400);
+
+    const aiRes = await fetch(`${baseUrl}/api/ai/research`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker: 'GOLDBEES', mode: 'antigravity' }),
+    });
+    assert.equal(aiRes.status, 503);
+    const aiErr = (await aiRes.json()) as { code: string };
+    assert.equal(aiErr.code, 'GEMINI_KEY_MISSING');
+  } finally {
+    if (prevKey !== undefined) process.env.GEMINI_API_KEY = prevKey;
+    await cleanup();
+  }
+});
