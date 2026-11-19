@@ -1,9 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pause, Play } from 'lucide-react';
 import {
+  applyHeatmapTick,
   buildSectorGroups,
-  getHeatmapTileSpan,
+  calculateRealizedVolatility,
+  computeD3TreemapLayout,
   getHeatmapTileStyle,
+  getVolatilityTileStyle,
   HEATMAP_STOCKS,
+  HeatmapColorMode,
   HeatmapMarket,
   HeatmapStockTile,
   heatmapTileToMarketSymbolRow,
@@ -13,23 +18,56 @@ import { MarketSymbolRow } from '../types/markets';
 
 interface SectorHeatmapProps {
   onSelectSymbol: (row: MarketSymbolRow) => void;
+  liveFeedActive?: boolean;
 }
 
-export const SectorHeatmap: React.FC<SectorHeatmapProps> = ({ onSelectSymbol }) => {
+const TREEMAP_WIDTH = 1160;
+const TREEMAP_HEIGHT = 490;
+
+export const SectorHeatmap: React.FC<SectorHeatmapProps> = ({
+  onSelectSymbol,
+  liveFeedActive = true,
+}) => {
   const [market, setMarket] = useState<HeatmapMarket>('global');
   const [sectorFilter, setSectorFilter] = useState<string>('All');
-  const [hoveredTile, setHoveredTile] = useState<HeatmapStockTile | null>(null);
+  const [colorMode, setColorMode] = useState<HeatmapColorMode>('volatility');
+  const [liveTiles, setLiveTiles] = useState<HeatmapStockTile[]>(() => HEATMAP_STOCKS);
+  const [isStreaming, setIsStreaming] = useState<boolean>(liveFeedActive);
+  const [tickCount, setTickCount] = useState<number>(0);
+  const [hoveredSymbol, setHoveredSymbol] = useState<string | null>(null);
+  const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setIsStreaming(liveFeedActive);
+  }, [liveFeedActive]);
+
+  useEffect(() => {
+    if (!isStreaming) return;
+    const interval = window.setInterval(() => {
+      setTickCount((prevTick) => {
+        const nextTick = prevTick + 1;
+        setLiveTiles((prevTiles) => applyHeatmapTick(prevTiles, nextTick));
+        return nextTick;
+      });
+    }, 2200);
+    return () => window.clearInterval(interval);
+  }, [isStreaming]);
 
   const availableSectors = useMemo(() => {
     const sectors = new Set(
-      HEATMAP_STOCKS.filter((s) => s.market === market).map((s) => s.sector)
+      liveTiles.filter((s) => s.market === market).map((s) => s.sector)
     );
     return ['All', ...Array.from(sectors)];
-  }, [market]);
+  }, [liveTiles, market]);
 
   const groups = useMemo(() => {
-    return buildSectorGroups(HEATMAP_STOCKS, market, sectorFilter);
-  }, [market, sectorFilter]);
+    return buildSectorGroups(liveTiles, market, sectorFilter);
+  }, [liveTiles, market, sectorFilter]);
+
+  const treemapLayout = useMemo(() => {
+    return computeD3TreemapLayout(groups, TREEMAP_WIDTH, TREEMAP_HEIGHT);
+  }, [groups]);
 
   const totals = useMemo(() => {
     const allTiles = groups.flatMap((g) => g.tiles);
