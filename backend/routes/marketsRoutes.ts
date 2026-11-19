@@ -132,12 +132,12 @@ export function createMarketsRouter(): Router {
 
     const payload = computeCompositeMarketSentiment({
       indices: MAJOR_INDICES,
-      crypto: CRYPTO_ASSETS,
+      crypto: GOLD_BULLION_ASSETS,
       macro: MACRO_SPARK_ROWS,
       news: aggregatedNews,
-      liveCryptoFng,
-      liveBtcChangePercent,
-      isLive: Boolean(liveCryptoFng || liveBtcChangePercent !== null || liveWireNews.length > 0),
+      liveCryptoFng: null,
+      liveBtcChangePercent: liveSpotGoldChangePercent,
+      isLive: liveSpotGoldChangePercent !== null,
       nowIso: new Date().toISOString(),
     });
 
@@ -145,7 +145,7 @@ export function createMarketsRouter(): Router {
     res.json(payload);
   });
 
-  router.get('/earnings-calendar', async (req, res) => {
+  const handlePolicyCalendar = async (req: Request, res: Response) => {
     const forceRefresh = req.query.refresh === '1';
     const now = Date.now();
     if (!forceRefresh && earningsCache && now - earningsCache.fetchedAt < 10 * 60 * 1000) {
@@ -158,12 +158,65 @@ export function createMarketsRouter(): Router {
     }
 
     let events = buildUpcomingEarningsCalendar(now);
-    let source = 'financia-consensus-schedule';
+    let source = 'financia-4pillar-policy-schedule';
 
-    if (process.env.FINNHUB_API_KEY) {
+    const from = new Date(now).toISOString().slice(0, 10);
+    const to = new Date(now + 35 * 86400 * 1000).toISOString().slice(0, 10);
+
+    if (process.env.FMP_API_KEY) {
       try {
-        const from = new Date(now).toISOString().slice(0, 10);
-        const to = new Date(now + 35 * 86400 * 1000).toISOString().slice(0, 10);
+        const fmpCal = await fetchFmpEndpoint('economic-calendar', { from, to });
+        if (Array.isArray(fmpCal.data) && fmpCal.data.length > 0) {
+          interface FmpEconRow {
+            date?: string;
+            country?: string;
+            event?: string;
+            impact?: string;
+            estimate?: number | string | null;
+            previous?: number | string | null;
+          }
+          const macroRows = (fmpCal.data as FmpEconRow[])
+            .filter((row) => {
+              const evt = String(row.event || '');
+              const country = String(row.country || '').toUpperCase();
+              const impact = String(row.impact || '').toLowerCase();
+              const isRateOrMacro = /rate|fomc|rbi|cpi|inflation|treasury|gilt|yield|gdp|gold|pce|bond/i.test(evt);
+              return (country === 'US' || country === 'IN') && (impact === 'high' || isRateOrMacro);
+            })
+            .slice(0, 4);
+
+          const mappedMacro = macroRows.map((row, idx) => {
+            const iso = row.date ? new Date(row.date.replace(' ', 'T') + (row.date.includes('Z') ? '' : 'Z')).toISOString() : new Date(now + (idx + 2) * 86400 * 1000).toISOString();
+            const isIndia = String(row.country || '').toUpperCase() === 'IN';
+            return {
+              id: `fmp-macro-${idx}-${String(row.event || 'macro').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12)}`,
+              ticker: isIndia ? 'SBIGILT' : 'TLT',
+              companyName: `${String(row.country || 'US').toUpperCase()} Macro · ${String(row.event || 'Monetary Policy Release')}`,
+              exchange: isIndia ? 'RBI / MOSPI' : 'US MACRO',
+              market: isIndia ? ('india' as const) : ('us' as const),
+              fiscalQuarter: String(row.impact || 'Macro'),
+              reportDateIso: iso,
+              dateLabel: iso.slice(0, 10),
+              session: 'BMO' as const,
+              epsEstimate: row.estimate !== null && row.estimate !== undefined ? String(row.estimate) : 'Consensus',
+              priorEps: row.previous !== null && row.previous !== undefined ? String(row.previous) : 'Prior',
+              revenueEstimate: isIndia ? 'IN Debt' : 'US Yields',
+              badgeColor: isIndia ? '#089981' : '#2563EB',
+            };
+          });
+
+          if (mappedMacro.length > 0) {
+            events = [...events, ...mappedMacro].sort(
+              (a, b) => Date.parse(a.reportDateIso) - Date.parse(b.reportDateIso)
+            );
+            source = 'fmp-macro-policy-calendar';
+          }
+        }
+      } catch {
+        // Fallback silently
+      }
+    } else if (process.env.FINNHUB_API_KEY) {
+      try {
         const fhRes = await fetchWithTimeout(
           `https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${encodeURIComponent(
             process.env.FINNHUB_API_KEY
@@ -172,7 +225,7 @@ export function createMarketsRouter(): Router {
         if (fhRes.ok) {
           const rawJson = await fhRes.json();
           events = mergeFinnhubEarnings(rawJson, events);
-          source = 'finnhub-live-earnings';
+          source = 'finnhub-etf-calendar';
         }
       } catch {
         // Fallback silently
@@ -185,7 +238,10 @@ export function createMarketsRouter(): Router {
       updatedAt: new Date(now).toISOString(),
       events,
     });
-  });
+  };
+
+  router.get('/policy-calendar', handlePolicyCalendar);
+  router.get('/earnings-calendar', handlePolicyCalendar);
 
   return router;
 }
