@@ -72,21 +72,73 @@ export async function createBackendApp(
       res.sendFile(path.join(distPath, 'index.html'));
     });
   } else {
-    const vite = await createViteServer({
+    let viteInstance: ViteDevServer | null = null;
+    const vitePromise = createViteServer({
       root: ROOT_DIR,
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr:
+          process.env.DISABLE_HMR === 'true'
+            ? false
+            : httpServer
+              ? { server: httpServer }
+              : false,
+      },
       appType: 'spa',
+    }).then((server) => {
+      viteInstance = server;
+      return server;
     });
-    app.use(vite.middlewares);
+
+    app.use(async (req, res, next) => {
+      try {
+        const vite = viteInstance ?? (await vitePromise);
+        vite.middlewares(req, res, next);
+      } catch (err) {
+        next(err);
+      }
+    });
   }
 
   return app;
 }
 
 export async function startBackendServer(): Promise<void> {
-  const app = await createBackendApp();
-  const port = Number(process.env.PORT || 3000);
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Financia backend server listening on http://localhost:${port}`);
+  const port = resolveServerPort();
+  const app = express();
+  const httpServer = http.createServer(app);
+
+  let readyApp: express.Express | null = null;
+  const appPromise = createBackendApp(httpServer).then((configured) => {
+    readyApp = configured;
+    return configured;
   });
+
+  app.get('/api/health', (_req, res, next) => {
+    if (readyApp) {
+      next();
+      return;
+    }
+    res.json({ status: 'ok', service: 'financia' });
+  });
+
+  app.use(async (req, res, next) => {
+    try {
+      const target = readyApp ?? (await appPromise);
+      target(req, res, next);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    httpServer.once('error', reject);
+    httpServer.listen(port, '0.0.0.0', () => {
+      console.log(`Financia backend server listening on http://localhost:${port}`);
+      resolve();
+    });
+  });
+
+  await appPromise;
 }
+
