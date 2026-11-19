@@ -217,8 +217,19 @@ export function computeNewsVolumeSignals(
   scope: SentimentScope = 'global'
 ): NewsVolumeSignals {
   const scoped = newsItems.filter((item) => {
-    if (scope === 'crypto') return item.category === 'crypto' || item.tickers.some((t) => /BTC|ETH|SOL/i.test(t));
-    if (scope === 'india') return item.category === 'indian_stocks' || item.tickers.some((t) => /NIFTY|SENSEX|RELIANCE|TCS|HDFC|ICICI/i.test(t));
+    if (scope === 'crypto') {
+      return (
+        item.category === 'gold_debt' ||
+        item.tickers.some((t) => /GOLD|PAXG|XAU|GLD|SGB|SILVER|GILT|AGG|TLT/i.test(t))
+      );
+    }
+    if (scope === 'india') {
+      return (
+        item.category === 'mutual_funds' ||
+        item.category === 'etfs' ||
+        item.tickers.some((t) => /PPFAS|NIFTY|GOLDBEES|SBIGILT|HDFCCORP|HDFCMID|UTI50|LIQUIDBEES/i.test(t))
+      );
+    }
     return true;
   });
 
@@ -498,8 +509,8 @@ export function computeCompositeMarketSentiment(params: {
     seedOffset: 3,
   });
 
-  // 2. India Markets Scope (NIFTY, SENSEX price trends, USDINR stability, India News Volume)
-  const indiaBenchmarks = indices.filter((i) => i.symbol === 'NIFTY' || i.symbol === 'SENSEX');
+  // 2. India Mutual Funds & Debt Scope (Nifty/Liquid/Gilt benchmarks, USDINR stability, AMFI News Volume)
+  const indiaBenchmarks = indices.filter((i) => i.symbol === 'NIFTY' || i.symbol === 'SENSEX' || i.symbol === 'NIFTYBEES');
   const indiaAvg = avgChange(indiaBenchmarks);
   const indiaSparkScore = avgSparklineTrendScore(indiaBenchmarks);
   const usdinr = macro.find((m) => m.symbol === 'USDINR');
@@ -530,7 +541,7 @@ export function computeCompositeMarketSentiment(params: {
     seedOffset: 11,
   });
 
-  // 3. Crypto Sentiment Scope (Live Alternative.me + Binance 24h delta + Crypto News Volume)
+  // 3. Gold & Bullion Sentiment Scope (Live Spot Gold PAXG/XAU + Bullion & Debt Wire Volume)
   const cryptoAvgPct =
     typeof liveBtcChangePercent === 'number' && Number.isFinite(liveBtcChangePercent)
       ? liveBtcChangePercent
@@ -569,7 +580,7 @@ export function computeCompositeMarketSentiment(params: {
     scopes: {
       global: {
         scope: 'global',
-        title: 'All Markets Sentiment',
+        title: 'All 4-Pillar Assets',
         score: globalScore,
         zone: globalZone.zone,
         color: globalZone.color,
@@ -581,20 +592,20 @@ export function computeCompositeMarketSentiment(params: {
         newsSignals: globalNews,
         summary:
           globalScore >= 56
-            ? 'Constructive price momentum and active wire news flow support selective cyclical positioning.'
+            ? 'Steady SIP inflows, bullion demand, and sovereign bond carry support balanced ETF & fund positioning.'
             : globalScore <= 44
-              ? 'Elevated defensive news volume and softer index price trends keep institutional positioning cautious.'
-              : 'Balanced wire headline velocity and cross-asset price trends ahead of macro catalysts.',
+              ? 'Rising sovereign yields and defensive wire coverage favor liquid debt, gilt duration, and physical gold hedges.'
+              : 'Balanced wire headline velocity across global index ETFs, gold bullion, and investment-grade debt.',
         drivers: [
           {
             id: 'mom',
-            label: 'Price trend momentum',
+            label: 'ETF & NAV trend',
             score: momentumGlobal,
             signal: indexAvgPct >= 0 ? 'Constructive' : 'Softening',
           },
           {
             id: 'news',
-            label: 'News volume & tone',
+            label: 'Fund & macro news',
             score: newsSignalGlobal,
             signal:
               globalNews.totalArticles > 0
@@ -603,24 +614,24 @@ export function computeCompositeMarketSentiment(params: {
           },
           {
             id: 'brd',
-            label: 'Global breadth',
+            label: 'Cross-pillar breadth',
             score: breadthGlobal,
-            signal: breadthGlobal >= 50 ? 'Broadening' : 'Narrow',
+            signal: breadthGlobal >= 50 ? 'Broadening' : 'Defensive',
           },
           {
             id: 'mac',
-            label: 'Rates & yields',
+            label: 'Sovereign yields',
             score: macroGlobal,
-            signal: macroGlobal >= 52 ? 'Easing' : 'Tight',
+            signal: macroGlobal >= 52 ? 'Duration Bid' : 'Tight Carry',
           },
         ],
         history7d: globalHistory90d.slice(-7).map((p) => p.score),
         history90d: globalHistory90d,
-        sourceLabel: isLive ? 'Financia Live News & Price Composite' : 'Financia News & Price Breadth',
+        sourceLabel: isLive ? 'Financia 4-Pillar News & Flow Composite' : 'Financia Fund, Gold & Debt Pulse',
       },
       crypto: {
         scope: 'crypto',
-        title: 'Crypto Fear & Greed',
+        title: 'Gold & Bullion Sentiment',
         score: cryptoScore,
         zone: cryptoZone.zone,
         color: cryptoZone.color,
@@ -632,10 +643,10 @@ export function computeCompositeMarketSentiment(params: {
         newsSignals: cryptoNews,
         summary:
           cryptoScore >= 56
-            ? 'Spot inflows, bullish headline tone, and constructive price trends support digital-asset appetite.'
+            ? 'Central-bank reserve buying, Gold ETF creations, and LBMA spot strength sustain bullion conviction.'
             : cryptoScore <= 44
-              ? 'High liquidation news volume and subdued token price breadth reflect defensive positioning.'
-              : 'Consolidation across BTC/ETH price curves keeps wire news sentiment balanced.',
+              ? 'Real-yield spikes and dollar strength weigh on spot gold and silver ETF short-term flows.'
+              : 'Consolidation across Spot Gold (LBMA), Gold BeES, and Sovereign Gold Bonds keeps sentiment balanced.',
         drivers: [
           {
             id: 'cmom',
