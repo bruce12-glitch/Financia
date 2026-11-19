@@ -52,7 +52,7 @@ export const FrontendWorkspaceHeader: React.FC<FrontendWorkspaceHeaderProps> = (
           </button>
           <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#161B26] border border-[#2A2E39] text-[11px] font-semibold text-[#60A5FA]">
             <LayoutGrid className="w-3 h-3" />
-            <span>Frontend Terminal</span>
+            <span>4-Pillar Workspace</span>
           </span>
         </div>
 
@@ -65,7 +65,7 @@ export const FrontendWorkspaceHeader: React.FC<FrontendWorkspaceHeaderProps> = (
             onClick={() => onJumpToSection('live-terminal')}
             className="hover:text-white transition-colors cursor-pointer whitespace-nowrap"
           >
-            Stock Analysis
+            Funds &amp; Gold
           </button>
           <button
             type="button"
@@ -79,14 +79,14 @@ export const FrontendWorkspaceHeader: React.FC<FrontendWorkspaceHeaderProps> = (
             onClick={() => onJumpToSection('markets')}
             className="hover:text-white transition-colors cursor-pointer whitespace-nowrap"
           >
-            Markets &amp; Earnings
+            MF, Debt &amp; Policy
           </button>
           <button
             type="button"
             onClick={() => onJumpToSection('global-exchanges-globe')}
             className="text-[#60A5FA] font-semibold hover:text-white transition-colors cursor-pointer whitespace-nowrap"
           >
-            3D Global Exchanges
+            3D Market Hubs
           </button>
           <button
             type="button"
