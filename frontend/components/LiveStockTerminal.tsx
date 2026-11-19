@@ -511,329 +511,38 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left 8 Columns: Real-Time Interactive Price Chart + 4Q Financial Performance */}
           <div className="lg:col-span-8 flex flex-col gap-6">
-            {/* Primary Interactive Price & Technicals Card */}
-            <div className="rounded-xl bg-white border border-[#E5E7EB] p-6">
-              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-5 mb-5 border-b border-[#F3F4F6]">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <h3 className="text-xl font-display font-bold text-[#131722] whitespace-nowrap">
-                      {activeStock.name} ({activeStock.ticker})
-                    </h3>
-                    <span className="text-xs text-[#6B7280] whitespace-nowrap shrink-0">
-                      · {activeStock.sector}
-                    </span>
-                    {activeStock.dataSource && (
-                      <span className="px-2 py-0.5 rounded bg-[#F9FAFB] border border-[#E5E7EB] text-[11px] font-mono text-[#2962FF] whitespace-nowrap shrink-0">
-                        {activeStock.dataSource}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-baseline gap-3 mt-1.5">
-                    <span className="text-3xl font-mono font-bold text-[#131722] tabular-nums whitespace-nowrap">
-                      {formatCurrency(activePoint ? activePoint.price : activeStock.price)}
-                    </span>
-                    <span
-                      className={`text-sm font-mono font-medium tabular-nums whitespace-nowrap ${
-                        activeStock.changePercent >= 0 ? 'text-[#089981]' : 'text-[#F23645]'
-                      }`}
-                    >
-                      {activeStock.change >= 0 ? '+' : ''}
-                      {activeStock.change.toFixed(2)} ({activeStock.changePercent >= 0 ? '+' : ''}
-                      {activeStock.changePercent.toFixed(2)}%)
-                    </span>
-                    {activePoint && (
-                      <span className="text-xs font-mono text-[#6B7280] tabular-nums whitespace-nowrap">
-                        · {activePoint.date} · Vol {activePoint.volume}M
-                      </span>
-                    )}
-                  </div>
-                </div>
+            {/* Primary Interactive Price, Technicals, RSI Overlay & Multi-Ticker Comparison Card */}
+            <TerminalMainChartCard
+              activeStock={activeStock}
+              stocks={stocks}
+              alerts={alerts}
+              comparisonTickers={comparisonTickers}
+              onComparisonTickersChange={onComparisonTickersChange}
+              onOpenSetAlert={onOpenSetAlert}
+            />
 
-                {/* Timeframe & Technical Overlay Controls */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div
-                    role="group"
-                    aria-label="Chart Timeframe"
-                    className="inline-flex items-center p-1 rounded-lg bg-[#F4F5F7] border border-[#E5E7EB]"
-                  >
-                    {(['1D', '1W', '1M', '4M', '1Y'] as const).map((tf) => (
-                      <button
-                        key={tf}
-                        type="button"
-                        onClick={() => {
-                          setTimeframe(tf);
-                          setHoveredPointIdx(null);
-                        }}
-                        className={`px-2.5 py-1 rounded text-xs font-mono transition-colors cursor-pointer ${
-                          timeframe === tf
-                            ? 'bg-[#131722] text-white font-semibold'
-                            : 'text-[#4B5563] hover:text-[#131722]'
-                        }`}
-                      >
-                        {tf}
-                      </button>
-                    ))}
-                  </div>
+            {/* Interactive 30-Day Historical Performance Chart (Recharts Line / Area) */}
+            <TerminalPriceTrendChart stock={activeStock} />
 
-                  <button
-                    type="button"
-                    onClick={() => setShowSMA((prev) => !prev)}
-                    aria-pressed={showSMA}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-mono border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                      showSMA
-                        ? 'bg-[#2962FF]/10 text-[#2962FF] border-[#2962FF]/40 font-semibold'
-                        : 'bg-white text-[#6B7280] border-[#E5E7EB]'
-                    }`}
-                  >
-                    SMA (4)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowBollinger((prev) => !prev)}
-                    aria-pressed={showBollinger}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-mono border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                      showBollinger
-                        ? 'bg-[#D97706]/10 text-[#B45309] border-[#D97706]/40 font-semibold'
-                        : 'bg-white text-[#6B7280] border-[#E5E7EB]'
-                    }`}
-                  >
-                    Bollinger
-                  </button>
-                  {onOpenSetAlert && (() => {
-                    const activeCount = alerts.filter((a) => a.ticker === activeStock.ticker).length;
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => onOpenSetAlert(activeStock)}
-                        className="px-3 py-1.5 rounded-lg bg-[#2962FF] hover:bg-[#1E53E5] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                      >
-                        <Bell className="w-3.5 h-3.5" />
-                        <span>{activeCount > 0 ? `Set Alert (${activeCount})` : 'Set Alert'}</span>
-                      </button>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Interactive SVG Price, SMA, Bollinger & Volume Chart */}
-              <div className="w-full overflow-x-auto">
-                <svg
-                  viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-                  className="w-full h-64 select-none overflow-visible"
-                  role="img"
-                  aria-label={`${activeStock.ticker} interactive stock price and volume chart`}
-                >
-                  <defs>
-                    <linearGradient id="financiaAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2962FF" stopOpacity="0.18" />
-                      <stop offset="75%" stopColor="#2962FF" stopOpacity="0.03" />
-                      <stop offset="100%" stopColor="#2962FF" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Horizontal Y-Axis Gridlines */}
-                  {[0, 0.33, 0.66, 1].map((ratio, idx) => {
-                    const y = padTop + ratio * plotH;
-                    const priceVal = maxPrice - ratio * (maxPrice - minPrice);
-                    return (
-                      <g key={idx}>
-                        <line
-                          x1={padLeft}
-                          y1={y}
-                          x2={svgWidth - padRight}
-                          y2={y}
-                          stroke="#E5E7EB"
-                          strokeDasharray="3 3"
-                        />
-                        <text
-                          x={padLeft - 8}
-                          y={y + 4}
-                          textAnchor="end"
-                          className="fill-[#6B7280] text-[10px] font-mono"
-                        >
-                          ${priceVal.toFixed(0)}
-                        </text>
-                      </g>
-                    );
-                  })}
-
-                  {/* Subtle Volume Bars along bottom */}
-                  {chartSeries.map((pt, i) => {
-                    const x = getX(i);
-                    const vHeight = (pt.volume / maxVol) * (plotH * 0.25);
-                    const y = padTop + plotH - vHeight;
-                    return (
-                      <rect
-                        key={`vol-${i}`}
-                        x={x - 6}
-                        y={y}
-                        width={12}
-                        height={vHeight}
-                        rx={2}
-                        fill="rgba(41, 98, 255, 0.14)"
-                      />
-                    );
-                  })}
-
-                  {/* Area under Price Curve */}
-                  <path d={areaPath} fill="url(#financiaAreaGrad)" />
-
-                  {/* Optional Bollinger Upper & Lower Bands */}
-                  {showBollinger && bollingerUpperPath && (
-                    <>
-                      <path
-                        d={bollingerUpperPath}
-                        fill="none"
-                        stroke="#D97706"
-                        strokeWidth={1.25}
-                        strokeDasharray="4 3"
-                      />
-                      <path
-                        d={bollingerLowerPath}
-                        fill="none"
-                        stroke="#D97706"
-                        strokeWidth={1.25}
-                        strokeDasharray="4 3"
-                      />
-                    </>
-                  )}
-
-                  {/* Optional Simple Moving Average (SMA) Curve */}
-                  {showSMA && smaPath && (
-                    <path
-                      d={smaPath}
-                      fill="none"
-                      stroke="#7C3AED"
-                      strokeWidth={1.5}
-                      strokeDasharray="3 3"
-                    />
-                  )}
-
-                  {/* Main Price Line */}
-                  <path
-                    d={linePath}
-                    fill="none"
-                    stroke="#2962FF"
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-
-                  {/* Interactive Data Nodes & X-Axis Labels */}
-                  {chartSeries.map((pt, i) => {
-                    const cx = getX(i);
-                    const cy = getY(pt.price);
-                    const isHovered = hoveredPointIdx === i;
-                    return (
-                      <g
-                        key={`pt-${i}`}
-                        onMouseEnter={() => setHoveredPointIdx(i)}
-                        onMouseLeave={() => setHoveredPointIdx(null)}
-                        className="cursor-pointer"
-                      >
-                        {isHovered && (
-                          <line
-                            x1={cx}
-                            y1={padTop}
-                            x2={cx}
-                            y2={padTop + plotH}
-                            stroke="rgba(41, 98, 255, 0.45)"
-                            strokeWidth={1}
-                          />
-                        )}
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={isHovered ? 5.5 : 3.5}
-                          fill={isHovered ? '#131722' : '#2962FF'}
-                          stroke="#FFFFFF"
-                          strokeWidth={1.5}
-                        />
-                        {/* Render X-axis label every 2nd point to stay clean */}
-                        {(i % 2 === 0 || i === chartSeries.length - 1) && (
-                          <text
-                            x={cx}
-                            y={svgHeight - 10}
-                            textAnchor="middle"
-                            className="fill-[#6B7280] text-[10px] font-mono"
-                          >
-                            {pt.date}
-                          </text>
-                        )}
-                        {/* Invisible wide hit target for smooth hover */}
-                        <rect
-                          x={cx - 16}
-                          y={padTop}
-                          width={32}
-                          height={plotH}
-                          fill="transparent"
-                        />
-                      </g>
-                    );
-                  })}
-                </svg>
-              </div>
-
-              {/* Key Quantitative Telemetry Strip below chart */}
-              <div className="grid grid-cols-2 sm:grid-cols-6 gap-4 pt-4 mt-4 border-t border-[#F3F4F6]">
-                <div>
-                  <div className="text-[11px] text-[#6B7280]">Market Cap</div>
-                  <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
-                    {activeStock.marketCap}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#6B7280]">Forward P/E</div>
-                  <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
-                    {activeStock.peRatio}x
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#6B7280]">14D RSI</div>
-                  <div className="text-sm font-mono font-semibold text-[#2962FF] tabular-nums mt-0.5">
-                    {activeStock.rsi14}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#6B7280]">Options IV Rank</div>
-                  <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
-                    {activeStock.ivRank}%
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#6B7280]">Inst. Ownership</div>
-                  <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
-                    {activeStock.institutionalOwnership}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#6B7280]">Next Earnings</div>
-                  <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
-                    {activeStock.nextEarnings}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 4-Quarter Financial Performance (Revenue vs Net Income from bruce12-glitch/Financia) */}
+            {/* 4-Quarter AUM Flows & Distribution Carry */}
             <div className="rounded-xl bg-white border border-[#E5E7EB] p-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
                 <div>
                   <h3 className="text-lg font-display font-semibold text-[#131722]">
-                    Quarterly Financial Performance (SEC 10-Q / 10-K)
+                    Quarterly AUM Flows &amp; Distribution Carry
                   </h3>
                   <p className="text-xs text-[#6B7280] mt-0.5">
-                    Trailing four completed quarters of GAAP Revenue vs. Net Income ($ Billions) and Gross Margin
+                    Trailing four quarters of Scheme AUM ($B Eq.) vs. Net Creations / Inflows and Custody or Yield
                   </p>
                 </div>
                 <div className="flex items-center gap-4 text-xs font-mono shrink-0">
                   <span className="flex items-center gap-1.5 text-[#131722] whitespace-nowrap shrink-0">
                     <span className="w-2.5 h-2.5 rounded-xs bg-[#2962FF] shrink-0" />
-                    Revenue ($B)
+                    AUM ($B Eq.)
                   </span>
                   <span className="flex items-center gap-1.5 text-[#131722] whitespace-nowrap shrink-0">
                     <span className="w-2.5 h-2.5 rounded-xs bg-[#089981] shrink-0" />
-                    Net Income ($B)
+                    Net Inflows ($B)
                   </span>
                 </div>
               </div>
@@ -854,7 +563,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                       <div className="flex items-center justify-between text-xs font-mono text-[#6B7280] mb-4">
                         <span>{q.quarter}</span>
                         {q.gross_margin && (
-                          <span className="text-[#2962FF] font-semibold">GM {q.gross_margin}%</span>
+                          <span className="text-[#2962FF] font-semibold">Custody {q.gross_margin}%</span>
                         )}
                       </div>
 
@@ -880,9 +589,9 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                       </div>
 
                       <div className="mt-2.5 flex items-center justify-between text-[11px] font-mono text-[#6B7280]">
-                        <span>GAAP EPS</span>
+                        <span>TER / Yield</span>
                         <span className="text-[#131722] font-semibold tabular-nums">
-                          ${q.eps?.toFixed(2) || '1.15'}
+                          {q.eps?.toFixed(2) || '0.45'}%
                         </span>
                       </div>
                     </div>
@@ -899,15 +608,15 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
               <div>
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <span className="text-[11px] font-mono font-semibold text-[#2962FF] whitespace-nowrap">
-                    EXECUTIVE VERDICT
+                    {activeGeminiOverride ? 'GEMINI LIVE VERDICT' : 'EXECUTIVE VERDICT'}
                   </span>
                   <span className="text-[11px] font-mono font-medium text-[#6B7280] tabular-nums whitespace-nowrap">
-                    {report.verdict.stance}
+                    {activeGeminiOverride ? activeGeminiOverride.stance : report.verdict.stance}
                   </span>
                 </div>
 
                 {/* Score Display */}
-                <div className="p-5 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] mb-5 flex items-center justify-between">
+                <div className="p-5 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] mb-4 flex items-center justify-between">
                   <div>
                     <div className="text-xs text-[#6B7280] mb-1">Institutional Conviction</div>
                     <div className="text-4xl font-display font-bold text-[#131722] tabular-nums">
