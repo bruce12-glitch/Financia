@@ -44,9 +44,9 @@ test('filterEarningsEvents filters by market scope and ticker/company search que
   assert.ok(indiaOnly.length >= 3);
   assert.ok(indiaOnly.every((e) => e.market === 'india'));
 
-  const nvdaOnly = filterEarningsEvents(events, 'us', 'nvidia');
-  assert.equal(nvdaOnly.length, 1);
-  assert.equal(nvdaOnly[0].ticker, 'NVDA');
+  const goldOnly = filterEarningsEvents(events, 'india', 'goldbees');
+  assert.equal(goldOnly.length, 1);
+  assert.equal(goldOnly[0].ticker, 'GOLDBEES');
 });
 
 test('mergeFinnhubEarnings cleanly merges live consensus figures when present', () => {
@@ -55,20 +55,20 @@ test('mergeFinnhubEarnings cleanly merges live consensus figures when present', 
     {
       earningsCalendar: [
         {
-          symbol: 'NVDA',
+          symbol: 'AGG',
           date: '2026-11-19',
-          epsEstimate: 0.91,
-          revenueEstimate: 46_200_000_000,
-          hour: 'amc',
+          epsEstimate: 4.72,
+          revenueEstimate: 120_500_000_000,
+          hour: 'bmo',
         },
       ],
     },
     baseline
   );
 
-  const nvda = merged.find((e) => e.ticker === 'NVDA');
-  assert.ok(nvda);
-  assert.equal(nvda.epsEstimate, '$0.91');
-  assert.equal(nvda.revenueEstimate, '$46.2B');
-  assert.equal(nvda.session, 'AMC');
+  const agg = merged.find((e) => e.ticker === 'AGG');
+  assert.ok(agg);
+  assert.equal(agg.epsEstimate, '$4.72');
+  assert.equal(agg.revenueEstimate, '$120.5B');
+  assert.equal(agg.session, 'BMO');
 });
