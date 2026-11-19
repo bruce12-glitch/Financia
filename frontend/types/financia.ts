@@ -85,11 +85,18 @@ export interface StockQuote {
   sector: PillarSector;
   assetClass?: 'Mutual Fund' | 'Gold Bullion' | 'Debt Fund' | 'ETF';
   price: number;
+  currencyUnit?: 'INR' | 'USD';
   change: number;
   changePercent: number;
   volume: string;
   marketCap: string;
+  aum?: string;
   peRatio: number;
+  expenseRatio?: string;
+  ytmOrCagr?: string;
+  modifiedDuration?: string;
+  creditRating?: string;
+  amfiSchemeCode?: string;
   rsi14: number;
   ivRank: number;
   convictionScore: number;
@@ -100,6 +107,8 @@ export interface StockQuote {
   cik?: string;
   report: ReportData;
 }
+
+export type FundQuote = StockQuote;
 
 export interface SectorShowcase {
   id: string;
@@ -159,7 +168,7 @@ export interface BlogBriefing {
 
 export interface FaqItem {
   id: string;
-  category: 'All Questions' | 'Stock Analysis' | 'Data Sources' | 'Platform Features';
+  category: 'All Questions' | 'Mutual Funds & ETFs' | 'Gold & Debt Funds' | 'Data Sources';
   question: string;
   answer: string;
 }
