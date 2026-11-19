@@ -224,3 +224,116 @@ export async function fetchFmpEndpoint(
 
   const cleanPath = endpointPath.replace(/^\/+/, '');
   try {
+    const { ok, data } = await fetchJsonWithTimeout(
+      `https://financialmodelingprep.com/stable/${cleanPath}?${qs.toString()}`,
+      { headers: { apikey: apiKey, Accept: 'application/json' } },
+      5000
+    );
+    if (ok && data && !(typeof data === 'object' && 'Error Message' in (data as Record<string, unknown>))) {
+      return { source: 'fmp-stable-live', data };
+    }
+  } catch {
+    // Fallback cleanly
+  }
+  return { source: 'financia-fallback', data: null };
+}
+
+export async function fetchFmpQuote(
+  ticker: string,
+  baseQuote: StockQuote
+): Promise<StockQuote | null> {
+  const apiKey = process.env.FMP_API_KEY;
+  if (!apiKey) return null;
+
+  const upper = ticker.trim().toUpperCase();
+  const fmpSymbol = FMP_SYMBOL_ALIAS[upper] || upper;
+  const now = Date.now();
+  const cached = fmpQuoteCache.get(upper);
+  if (cached && now - cached.fetchedAt < 5 * 60 * 1000) {
+    return cached.quote;
+  }
+
+  const [quoteRes, histRes] = await Promise.all([
+    fetchFmpEndpoint('quote', { symbol: fmpSymbol }),
+    fetchFmpEndpoint('historical-price-eod/full', { symbol: fmpSymbol }),
+  ]);
+
+  const parsed = parseFmpQuoteAndHistory(
+    Array.isArray(quoteRes.data) ? (quoteRes.data as FmpQuoteRow[]) : null,
+    Array.isArray(histRes.data) ? (histRes.data as FmpHistoricalRow[]) : null,
+    baseQuote
+  );
+
+  if (parsed) {
+    fmpQuoteCache.set(upper, { fetchedAt: now, quote: parsed });
+  }
+  return parsed;
+}
+
+export async function fetchTreasuryYieldCurve(): Promise<{
+  source: string;
+  usTreasury: { asOfDate: string; tenors: Array<{ label: string; yieldPct: number }> };
+  indiaGsecBenchmark: Array<{ label: string; yieldPct: number }>;
+}> {
+  const res = await fetchFmpEndpoint('treasury-rates');
+  const parsed = parseFmpTreasuryRates(res.data);
+  const usTreasury = parsed || {
+    asOfDate: new Date().toISOString().slice(0, 10),
+    tenors: [
+      { label: '3M', yieldPct: 4.52 },
+      { label: '2Y', yieldPct: 4.18 },
+      { label: '5Y', yieldPct: 4.21 },
+      { label: '10Y', yieldPct: 4.35 },
+      { label: '30Y', yieldPct: 4.62 },
+    ],
+  };
+
+  return {
+    source: parsed ? 'fmp-stable-live' : 'financia-sovereign-curve',
+    usTreasury,
+    indiaGsecBenchmark: [
+      { label: '91D T-Bill', yieldPct: 6.42 },
+      { label: '1Y G-Sec', yieldPct: 6.58 },
+      { label: '5Y G-Sec', yieldPct: 6.69 },
+      { label: '10Y G-Sec', yieldPct: 6.79 },
+      { label: '30Y SDL/G-Sec', yieldPct: 7.08 },
+    ],
+  };
+}
+
+export async function fetchCombinedEtfDossier(symbol: string): Promise<{
+  symbol: string;
+  ninjasSource: string;
+  fmpSource: string;
+  summary: StockQuote;
+  ninjasDetail: ApiNinjasEtfDetailPayload;
+  fmpInfo: unknown;
+  holdings: unknown[];
+  sectorWeightings: unknown[];
+  countryWeightings: unknown[];
+}> {
+  const clean = symbol.trim().toUpperCase();
+  const base = synthesizeCustomTickerReport(clean, INITIAL_STOCKS);
+
+  const [ninjas, infoRes, holdingsRes, sectorRes, countryRes] = await Promise.all([
+    fetchApiNinjasEtfDetail(clean),
+    fetchFmpEndpoint('etf/info', { symbol: clean }),
+    fetchFmpEndpoint('etf/holdings', { symbol: clean }),
+    fetchFmpEndpoint('etf/sector-weightings', { symbol: clean }),
+    fetchFmpEndpoint('etf/country-weightings', { symbol: clean }),
+  ]);
+
+  const enrichedSummary = parseApiNinjasEtfDetail(ninjas.payload, base) || base;
+
+  return {
+    symbol: clean,
+    ninjasSource: ninjas.source,
+    fmpSource: infoRes.source,
+    summary: enrichedSummary,
+    ninjasDetail: ninjas.payload,
+    fmpInfo: infoRes.data,
+    holdings: Array.isArray(holdingsRes.data) ? holdingsRes.data.slice(0, 25) : [],
+    sectorWeightings: Array.isArray(sectorRes.data) ? sectorRes.data : [],
+    countryWeightings: Array.isArray(countryRes.data) ? countryRes.data : [],
+  };
+}
