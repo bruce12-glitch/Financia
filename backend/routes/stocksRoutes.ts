@@ -177,7 +177,7 @@ export function createStocksRouter(): Router {
         const candles = parseBinanceKlines(rawRows);
         if (candles.length > 0) {
           res.json({
-            source: 'binance-public-rest',
+            source: 'binance-spot-gold-rest',
             symbol,
             interval,
             candles,
@@ -189,19 +189,22 @@ export function createStocksRouter(): Router {
       // Fallback cleanly
     }
 
-    const btcFallback =
-      SUPERCHART_INSTRUMENTS.find((item) => item.symbol === 'BTCUSD') ||
-      SUPERCHART_INSTRUMENTS[2];
+    const goldFallback =
+      SUPERCHART_INSTRUMENTS.find((item) => item.symbol === 'PAXGUSDT' || item.symbol === 'GOLDBEES') ||
+      SUPERCHART_INSTRUMENTS[0];
     res.json({
       source: 'financia-fallback',
       symbol,
       interval,
-      candles: btcFallback.candles,
+      candles: goldFallback.candles,
     });
-  });
+  };
+
+  router.get('/gold/klines', handleGoldKlines);
+  router.get('/crypto/klines', handleGoldKlines);
 
   router.get('/sec/company/:ticker', async (req, res) => {
-    const ticker = String(req.params.ticker || 'AAPL').trim().toUpperCase();
+    const ticker = String(req.params.ticker || 'GLD').trim().toUpperCase();
     const meta = await resolveSecCompanyMeta(ticker);
     if (!meta) {
       res.status(404).json({ error: `No SEC CIK mapping found for ${ticker}` });
@@ -224,39 +227,29 @@ export function createStocksRouter(): Router {
     });
   });
 
-  router.get('/stocks/analyze', async (req, res) => {
-    const rawTicker = String(req.query.ticker || 'NVDA').trim().toUpperCase();
-    if (!/^[A-Z0-9.^]{1,12}$/.test(rawTicker)) {
-      res.status(400).json({ error: 'Invalid ticker symbol format.' });
+  const handleAnalyze = async (req: Request, res: Response) => {
+    const rawTicker = String(req.query.ticker || 'GOLDBEES').trim().toUpperCase();
+    const check = validateTickerInput(rawTicker);
+    if (!check.valid) {
+      res.status(400).json({ error: check.error || 'Invalid symbol format.' });
       return;
     }
 
-    let stock = synthesizeCustomTickerReport(rawTicker, INITIAL_STOCKS);
-    let sourceLabel = 'financia-research-engine';
+    const { stock, source } = await enrichStockQuote(check.normalized);
+    res.json({
+      source,
+      stock,
+    });
+  };
 
-    if (process.env.FINNHUB_API_KEY) {
-      try {
-        const fhRes = await fetchWithTimeout(
-          `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(
-            rawTicker
-          )}&token=${encodeURIComponent(process.env.FINNHUB_API_KEY)}`
-        );
-        if (fhRes.ok) {
-          const payload = (await fhRes.json()) as {
-            c?: number;
-            d?: number;
-            dp?: number;
-            pc?: number;
-          };
-          const merged = mergeFinnhubQuote(payload, stock);
-          if (merged.dataSource === 'Finnhub Live Quote') {
-            stock = merged;
-            sourceLabel = 'finnhub-live';
-          }
-        }
-      } catch {
-        // Continue to secondary providers
-      }
+  router.get('/funds/analyze', handleAnalyze);
+  router.get('/stocks/analyze', handleAnalyze);
+
+  const handleTechnicals = async (req: Request, res: Response) => {
+    const check = validateTickerInput(String(req.params.ticker || 'GOLDBEES'));
+    if (!check.valid) {
+      res.status(400).json({ error: check.error || 'Invalid symbol format.' });
+      return;
     }
 
     if (sourceLabel === 'financia-research-engine') {
