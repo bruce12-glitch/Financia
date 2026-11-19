@@ -1,6 +1,8 @@
+import * as d3 from 'd3';
 import { MarketSymbolRow } from '../types/markets';
 
 export type HeatmapMarket = 'global' | 'india';
+export type HeatmapColorMode = 'volatility' | 'performance';
 
 export interface HeatmapStockTile {
   symbol: string;
@@ -21,13 +23,49 @@ export interface HeatmapTileColors {
   tier: 'Strong Gain' | 'Gain' | 'Flat' | 'Loss' | 'Sharp Loss';
 }
 
+export interface HeatmapVolatilityColors {
+  bg: string;
+  text: string;
+  subText: string;
+  tier: 'Calm' | 'Moderate' | 'Elevated' | 'Extreme';
+}
+
 export interface HeatmapSectorGroup {
   sector: string;
   totalCapB: number;
   avgChangePercent: number;
+  volatilityPct: number;
+  dispersionPct: number;
   advancers: number;
   decliners: number;
   tiles: HeatmapStockTile[];
+}
+
+export interface D3TreemapSectorRect {
+  sector: string;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  avgChangePercent: number;
+  volatilityPct: number;
+  dispersionPct: number;
+  totalCapB: number;
+}
+
+export interface D3TreemapTileRect {
+  tile: HeatmapStockTile;
+  volatilityPct: number;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+export interface D3TreemapLayoutResult {
+  sectors: D3TreemapSectorRect[];
+  tiles: D3TreemapTileRect[];
+  maxVolatilityPct: number;
 }
 
 export const HEATMAP_STOCKS: HeatmapStockTile[] = [
