@@ -23,8 +23,8 @@ test('validatePriceAlertInput rejects empty, zero, and negative thresholds clean
 test('evaluateAlertTrigger respects condition direction, notification toggle, and triggered flag', () => {
   const aboveAlert: PriceAlert = {
     id: 'a1',
-    ticker: 'NVDA',
-    companyName: 'NVIDIA Corporation',
+    ticker: 'GOLDBEES',
+    companyName: 'Nippon India ETF Gold BeES',
     targetPrice: 145,
     currentPriceAtSet: 138.6,
     condition: 'above',
