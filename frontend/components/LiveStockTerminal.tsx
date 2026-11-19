@@ -620,25 +620,58 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                   <div>
                     <div className="text-xs text-[#6B7280] mb-1">Institutional Conviction</div>
                     <div className="text-4xl font-display font-bold text-[#131722] tabular-nums">
-                      {report.verdict.conviction_score}
+                      {activeGeminiOverride
+                        ? activeGeminiOverride.conviction_score
+                        : report.verdict.conviction_score}
                       <span className="text-lg text-[#9CA3AF] font-normal"> / 100</span>
                     </div>
                   </div>
                   <div className="text-right font-mono text-xs text-[#089981] font-medium space-y-1">
-                    <div>SEC Filings: Verified</div>
-                    <div className="text-[#2962FF]">10-Q / 8-K Grounded</div>
+                    <div>AMFI / Custodian: Verified</div>
+                    <div className="text-[#2962FF]">SID · YTM · NAV Grounded</div>
                   </div>
                 </div>
 
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    data-testid="gemini-research-btn"
+                    disabled={aiLoading}
+                    onClick={handleRunGeminiSynthesis}
+                    className="w-full py-2 px-3 rounded-lg bg-[#EFF6FF] hover:bg-[#DBEAFE] disabled:opacity-60 border border-[#BFDBFE] text-[#1D4ED8] text-xs font-mono font-semibold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>
+                      {aiLoading
+                        ? `Synthesizing ${activeStock.ticker} with Gemini...`
+                        : `Synthesize Live Verdict (${activeStock.ticker})`}
+                    </span>
+                  </button>
+                  {aiError && (
+                    <div
+                      role="alert"
+                      data-testid="gemini-research-error"
+                      className="mt-2 p-2.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] text-[11px] leading-snug"
+                    >
+                      {aiError}
+                    </div>
+                  )}
+                </div>
+
                 <p className="text-sm text-[#374151] leading-relaxed mb-5">
-                  &ldquo;{report.verdict.summary}&rdquo;
+                  &ldquo;
+                  {activeGeminiOverride ? activeGeminiOverride.summary : report.verdict.summary}
+                  &rdquo;
                 </p>
 
                 <div className="text-xs font-semibold text-[#131722] mb-3 pb-2 border-b border-[#E5E7EB]">
                   Key Institutional Takeaways
                 </div>
                 <ul className="space-y-2.5 mb-6">
-                  {report.verdict.key_takeaways.map((item, idx) => (
+                  {(activeGeminiOverride && activeGeminiOverride.key_takeaways.length > 0
+                    ? activeGeminiOverride.key_takeaways
+                    : report.verdict.key_takeaways
+                  ).map((item, idx) => (
                     <li key={idx} className="flex items-start gap-2.5 text-xs text-[#374151] leading-relaxed">
                       <CheckCircle2 className="w-4 h-4 text-[#2962FF] shrink-0 mt-0.5" />
                       <span>{item}</span>
@@ -714,7 +747,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                 Tier-2 Adversarial Scenario Modeling — {activeStock.ticker}
               </h3>
               <p className="text-xs text-[#6B7280] mt-0.5">
-                Competing Upside (Bull), Downside (Bear), and Base Case theses stress-tested against SEC disclosures
+                Competing Upside (Bull), Downside (Bear), and Base Case theses stress-tested against AMFI &amp; custodial disclosures
               </p>
             </div>
             <div
@@ -802,7 +835,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                 Actionable Deep Insights
               </h3>
               <div className="flex flex-wrap items-center gap-1.5">
-                {['All', 'Fundamental', 'Technical', 'Options & Flow', 'Insider & SEC'].map(
+                {['All', 'Fund Flow', 'Yield & Duration', 'Factsheet & AMFI', 'Technical', 'Macro'].map(
                   (cat) => (
                     <button
                       key={cat}
@@ -858,15 +891,15 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
             )}
           </div>
 
-          {/* Grounded SEC Document Findings */}
+          {/* Grounded AMFI SID & Vault Disclosures */}
           <div className="lg:col-span-5 rounded-xl bg-white border border-[#E5E7EB] p-6">
             <div className="flex items-center justify-between pb-4 mb-5 border-b border-[#E5E7EB]">
               <div>
                 <h3 className="text-lg font-display font-semibold text-[#131722]">
-                  Verified SEC EDGAR Filings
+                  Verified AMFI SID &amp; Vault Disclosures
                 </h3>
                 <p className="text-xs text-[#6B7280] mt-0.5">
-                  Direct extracts from 10-K, 10-Q, and 8-K disclosures
+                  Direct extracts from AMFI mfapi.in, SIDs, and bullion audits
                 </p>
               </div>
               <FileText className="w-5 h-5 text-[#2962FF]" />
@@ -882,7 +915,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                     <div>
                       <div className="text-sm font-semibold text-[#131722]">{finding.documentType}</div>
                       <div className="text-xs font-mono text-[#6B7280] mt-0.5">
-                        Filed: {finding.date}
+                        Updated: {finding.date}
                       </div>
                     </div>
                     <a
@@ -891,7 +924,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                       rel="noopener noreferrer"
                       className="text-xs font-mono text-[#2962FF] hover:underline inline-flex items-center gap-1 shrink-0"
                     >
-                      <span>EDGAR</span>
+                      <span>SOURCE</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
