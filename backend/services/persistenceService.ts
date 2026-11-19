@@ -103,3 +103,107 @@ export function createPersistenceStore(filePath: string = DEFAULT_STORE_PATH) {
     },
 
     // Accounts
+    getAccount(email: string): StoredAccountRecord | undefined {
+      return state.accounts[email];
+    },
+    hasAccount(email: string): boolean {
+      return Object.prototype.hasOwnProperty.call(state.accounts, email);
+    },
+    setAccount(email: string, record: StoredAccountRecord): void {
+      state.accounts[email] = record;
+      flushToDisk();
+    },
+    listAccountCount(): number {
+      return Object.keys(state.accounts).length;
+    },
+
+    // Price Alerts
+    getUserAlerts(userId: string): PriceAlert[] {
+      return [...(state.alertsByUser[userId] || [])];
+    },
+    addUserAlert(userId: string, alert: PriceAlert): PriceAlert[] {
+      const existing = state.alertsByUser[userId] || [];
+      const next = [alert, ...existing];
+      state.alertsByUser[userId] = next;
+      flushToDisk();
+      return [...next];
+    },
+    updateUserAlert(
+      userId: string,
+      alertId: string,
+      patch: Partial<Pick<PriceAlert, 'notificationsEnabled' | 'triggered' | 'targetPrice' | 'note'>>
+    ): PriceAlert | null {
+      const existing = state.alertsByUser[userId] || [];
+      const idx = existing.findIndex((a) => a.id === alertId);
+      if (idx === -1) return null;
+      const updated: PriceAlert = { ...existing[idx], ...patch };
+      state.alertsByUser[userId] = existing.map((item, i) => (i === idx ? updated : item));
+      flushToDisk();
+      return updated;
+    },
+    deleteUserAlert(userId: string, alertId: string): boolean {
+      const existing = state.alertsByUser[userId] || [];
+      const next = existing.filter((a) => a.id !== alertId);
+      if (next.length === existing.length) return false;
+      state.alertsByUser[userId] = next;
+      flushToDisk();
+      return true;
+    },
+
+    // Watchlists & Comparisons
+    getUserWatchlist(userId: string): UserWatchlistState {
+      const existing = state.watchlistsByUser[userId];
+      if (existing) return { ...existing };
+      return {
+        primaryTicker: 'GOLDBEES',
+        watchlistTickers: [...DEFAULT_WATCHLIST_TICKERS],
+        comparisonTickers: [],
+        updatedAt: new Date().toISOString(),
+      };
+    },
+    setUserWatchlist(
+      userId: string,
+      input: Partial<Pick<UserWatchlistState, 'primaryTicker' | 'watchlistTickers' | 'comparisonTickers'>>
+    ): UserWatchlistState {
+      const current = this.getUserWatchlist(userId);
+      const next: UserWatchlistState = {
+        primaryTicker: (input.primaryTicker || current.primaryTicker).trim().toUpperCase() || 'GOLDBEES',
+        watchlistTickers: Array.isArray(input.watchlistTickers)
+          ? Array.from(
+              new Set(
+                input.watchlistTickers
+                  .map((t) => String(t).trim().toUpperCase())
+                  .filter((t) => /^[A-Z0-9.^]{1,12}$/.test(t))
+              )
+            ).slice(0, 12)
+          : current.watchlistTickers,
+        comparisonTickers: Array.isArray(input.comparisonTickers)
+          ? Array.from(
+              new Set(
+                input.comparisonTickers
+                  .map((t) => String(t).trim().toUpperCase())
+                  .filter((t) => /^[A-Z0-9.^]{1,12}$/.test(t))
+              )
+            ).slice(0, 4)
+          : current.comparisonTickers,
+        updatedAt: new Date().toISOString(),
+      };
+      state.watchlistsByUser[userId] = next;
+      flushToDisk();
+      return { ...next };
+    },
+
+    // Research Inquiries
+    addInquiry(inquiry: ResearchInquiry): ResearchInquiry {
+      state.inquiries = [inquiry, ...state.inquiries].slice(0, 500);
+      flushToDisk();
+      return inquiry;
+    },
+    listUserInquiries(userId: string): ResearchInquiry[] {
+      return state.inquiries.filter((item) => item.userId === userId);
+    },
+  };
+}
+
+export type PersistenceStore = ReturnType<typeof createPersistenceStore>;
+export const financiaStore = createPersistenceStore(DEFAULT_STORE_PATH);
