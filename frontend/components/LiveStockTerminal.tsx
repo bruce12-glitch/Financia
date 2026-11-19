@@ -19,13 +19,9 @@ import {
 } from 'lucide-react';
 import { StockQuote, TimelineEvent } from '../types/financia';
 import { PriceAlert } from '../utils/alertEngine';
-import {
-  calculateSMA,
-  calculateBollingerBands,
-  formatCurrency,
-  getSeriesForTimeframe,
-  validateTickerInput,
-} from '../utils/stockEngine';
+import { formatCurrency, validateTickerInput } from '../utils/stockEngine';
+import { TerminalMainChartCard } from './TerminalMainChartCard';
+import { TerminalPriceTrendChart } from './TerminalPriceTrendChart';
 
 interface LiveStockTerminalProps {
   stocks: StockQuote[];
@@ -35,7 +31,17 @@ interface LiveStockTerminalProps {
   liveFeedActive: boolean;
   onToggleLiveFeed: () => void;
   alerts?: PriceAlert[];
+  comparisonTickers?: string[];
+  onComparisonTickersChange?: (nextTickers: string[]) => void;
   onOpenSetAlert?: (stock: StockQuote) => void;
+}
+
+interface GeminiVerdictOverride {
+  ticker: string;
+  conviction_score: number;
+  stance: string;
+  summary: string;
+  key_takeaways: string[];
 }
 
 export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
@@ -46,17 +52,20 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
   liveFeedActive,
   onToggleLiveFeed,
   alerts = [],
+  comparisonTickers,
+  onComparisonTickersChange,
   onOpenSetAlert,
 }) => {
   const [tickerInput, setTickerInput] = useState<string>('');
   const [inputError, setInputError] = useState<string | null>(null);
   const [agentMode, setAgentMode] = useState<'antigravity' | 'perseus'>('perseus');
-  const [timeframe, setTimeframe] = useState<'1D' | '1W' | '1M' | '4M' | '1Y'>('4M');
-  const [showSMA, setShowSMA] = useState<boolean>(true);
-  const [showBollinger, setShowBollinger] = useState<boolean>(false);
   const [activeCaseTab, setActiveCaseTab] = useState<'all' | 'bull' | 'bear' | 'base'>('all');
   const [insightCategory, setInsightCategory] = useState<string>('All');
-  const [hoveredPointIdx, setHoveredPointIdx] = useState<number | null>(null);
+
+  // Live Gemini AI synthesis state (/api/ai/research)
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [geminiVerdict, setGeminiVerdict] = useState<GeminiVerdictOverride | null>(null);
 
   // Multi-agent execution timeline state
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
@@ -73,20 +82,18 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
   }, [stocks, selectedTicker]);
 
   const report = activeStock.report;
-
-  // Compute timeframe series & technical overlays
-  const chartSeries = useMemo(() => {
-    return getSeriesForTimeframe(report.financial_charts.stock_price_4m, timeframe);
-  }, [report.financial_charts.stock_price_4m, timeframe]);
-
-  const pricesOnly = useMemo(() => chartSeries.map((d) => d.price), [chartSeries]);
-  const smaSeries = useMemo(() => calculateSMA(pricesOnly, 4), [pricesOnly]);
-  const bollingerSeries = useMemo(() => calculateBollingerBands(pricesOnly, 4, 1.8), [pricesOnly]);
+  const activeGeminiOverride =
+    geminiVerdict && geminiVerdict.ticker === activeStock.ticker ? geminiVerdict : null;
 
   const filteredInsights = useMemo(() => {
     if (insightCategory === 'All') return report.deep_insights;
     return report.deep_insights.filter((item) => item.category === insightCategory);
   }, [report.deep_insights, insightCategory]);
+
+  // Reset AI synthesis alert when switching primary ticker
+  useEffect(() => {
+    setAiError(null);
+  }, [activeStock.ticker]);
 
   // Stop audio on unmount or ticker switch
   useEffect(() => {
@@ -98,6 +105,45 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
     };
   }, []);
 
+  const handleRunGeminiSynthesis = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch('/api/ai/research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticker: activeStock.ticker,
+          mode: agentMode,
+        }),
+      });
+      const payload = (await res.json()) as {
+        error?: string;
+        analysis?: {
+          conviction_score: number;
+          stance: string;
+          summary: string;
+          key_takeaways: string[];
+        };
+      };
+      if (!res.ok || !payload.analysis) {
+        setAiError(payload.error || 'Gemini analysis could not be completed.');
+        return;
+      }
+      setGeminiVerdict({
+        ticker: activeStock.ticker,
+        conviction_score: payload.analysis.conviction_score,
+        stance: payload.analysis.stance,
+        summary: payload.analysis.summary,
+        key_takeaways: payload.analysis.key_takeaways,
+      });
+    } catch {
+      setAiError('Network error reaching /api/ai/research.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const triggerAgentAnalysisRun = (targetTicker: string, mode: 'antigravity' | 'perseus') => {
     setIsAnalyzing(true);
     setShowTimelineModal(true);
@@ -108,16 +154,16 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
         id: 1,
         kind: 'info',
         label: `Bootstrapping ${mode === 'perseus' ? 'Perseus Multi-Agent Committee' : 'Antigravity Flash Engine'} for ${targetTicker}`,
-        detail: `Loading SEC EDGAR grounding rules, 10-K/10-Q footnote parsers, and live options surface telemetry for ${targetTicker}.`,
+        detail: `Loading AMFI NAV feeds, Scheme Information Documents (SID/KIM), LBMA physical gold custody telemetry, and YTM duration curves for ${targetTicker}.`,
         startTime: now,
         endTime: now + 320,
       },
       {
         id: 2,
         kind: 'tool_call',
-        label: `Tier 1 Sub-Agents: SEC Filings & Quantitative Surface Extraction`,
-        toolName: 'sec_edgar_search + options_iv_surface',
-        detail: `Querying Form 10-Q, Form 8-K, and Form 13F institutional holdings for ${targetTicker}; computing 20/50-day moving averages and dealer gamma walls.`,
+        label: `Tier 1 Sub-Agents: AMFI Scheme NAVs & Custodial Yield Extraction`,
+        toolName: 'amfi_nav_api + marketstack_etf_eod',
+        detail: `Querying live AMFI NAVs, SID disclosures, Marketstack EOD ETF pricing, and sovereign yield spreads for ${targetTicker}; computing modified duration and rolling CAGR.`,
         startTime: now + 320,
         endTime: now + 790,
       },
