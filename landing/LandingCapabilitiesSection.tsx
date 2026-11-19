@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowUpRight, Globe2, Layers, ShieldCheck, TrendingUp } from 'lucide-react';
 import {
-  CRYPTO_ASSETS,
-  ENERGY_FUTURES,
+  DEBT_FUND_LEADERS,
   FOREX_PERFORMANCE_PAIRS,
+  GOLD_BULLION_ASSETS,
   MAJOR_INDICES,
-  METALS_FUTURES,
+  MUTUAL_FUND_LEADERS,
 } from '../frontend/data/tradingViewData';
 import { ExchangeRegion, GLOBAL_STOCK_EXCHANGES } from '../frontend/utils/globalExchanges';
 import {
@@ -19,7 +19,7 @@ interface LandingCapabilitiesSectionProps {
   onInspectSymbol?: (symbol: string) => void;
 }
 
-type AssetPreviewTab = 'Indices' | 'Forex' | 'Crypto' | 'Futures';
+type AssetPreviewTab = 'ETFs' | 'Gold' | 'Debt Funds' | 'Mutual Funds' | 'Forex';
 
 export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProps> = ({
   onRequestWorkspace,
@@ -27,7 +27,7 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
 }) => {
   const [activeTicker, setActiveTicker] = useState<string>(LANDING_AGENT_SAMPLES[0].ticker);
   const [activeRegion, setActiveRegion] = useState<'All' | ExchangeRegion>('All');
-  const [assetTab, setAssetTab] = useState<AssetPreviewTab>('Indices');
+  const [assetTab, setAssetTab] = useState<AssetPreviewTab>('ETFs');
 
   const activeAgentSample = useMemo(
     () =>
@@ -45,42 +45,52 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
   }, [activeRegion]);
 
   const assetRows = useMemo(() => {
-    if (assetTab === 'Indices') {
-      return MAJOR_INDICES.slice(0, 4).map((r) => ({
-        symbol: r.symbol,
-        name: r.name,
-        price: r.price,
-        changePercent: r.changePercent,
+    if (assetTab === 'ETFs') {
+      return MAJOR_INDICES.filter((r) => r.category === 'etfs' || r.category === 'gold')
+        .slice(0, 4)
+        .map((r) => ({
+          symbol: r.symbol,
+          name: r.name,
+          price: r.price,
+          changePercent: r.changePercent,
+        }));
+    }
+    if (assetTab === 'Gold') {
+      return GOLD_BULLION_ASSETS.slice(0, 4).map((g) => ({
+        symbol: g.symbol,
+        name: g.name,
+        price: g.price,
+        changePercent: g.changePercent,
       }));
     }
-    if (assetTab === 'Forex') {
-      return FOREX_PERFORMANCE_PAIRS.slice(0, 4).map((fx) => ({
-        symbol: fx.pair,
-        name: `${fx.baseFlag}${fx.quoteFlag} Spot`,
-        price: fx.spotRate,
-        changePercent: fx.returns['1D'],
+    if (assetTab === 'Debt Funds') {
+      return DEBT_FUND_LEADERS.slice(0, 4).map((d) => ({
+        symbol: d.symbol,
+        name: d.name,
+        price: d.price,
+        changePercent: d.changePercent,
       }));
     }
-    if (assetTab === 'Crypto') {
-      return CRYPTO_ASSETS.slice(1, 5).map((c) => ({
-        symbol: c.symbol,
-        name: c.name,
-        price: c.price,
-        changePercent: c.changePercent,
+    if (assetTab === 'Mutual Funds') {
+      return MUTUAL_FUND_LEADERS.slice(0, 4).map((m) => ({
+        symbol: m.symbol,
+        name: m.name,
+        price: m.price,
+        changePercent: m.changePercent,
       }));
     }
-    return [...ENERGY_FUTURES.slice(0, 2), ...METALS_FUTURES.slice(0, 2)].map((f) => ({
-      symbol: f.symbol,
-      name: f.name,
-      price: f.price,
-      changePercent: f.changePercent,
+    return FOREX_PERFORMANCE_PAIRS.slice(0, 4).map((fx) => ({
+      symbol: fx.pair,
+      name: `${fx.baseFlag}${fx.quoteFlag} Spot`,
+      price: fx.spotRate,
+      changePercent: fx.returns['1D'],
     }));
   }, [assetTab]);
 
   return (
     <section
       id="landing-capabilities"
-      aria-label="Institutional Research Architecture and Capabilities"
+      aria-label="Mutual Fund, Gold, Debt Fund and ETF Research Architecture"
       className="relative w-full bg-[#05070C] text-white border-t border-[#161B26] py-20 lg:py-24 px-4 md:px-10 overflow-hidden"
     >
       <div className="max-w-[1220px] mx-auto">
@@ -88,7 +98,7 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
           <div className="max-w-2xl">
             <div className="text-xs font-mono text-[#60A5FA] mb-3">
-              02. Institutional Research Architecture
+              02. 4-Pillar Wealth Architecture
             </div>
             <h2
               className="font-display font-bold text-white tracking-[-0.025em]"
@@ -98,11 +108,11 @@ export const LandingCapabilitiesSection: React.FC<LandingCapabilitiesSectionProp
                 textWrap: 'balance',
               }}
             >
-              Built for conviction. Grounded in primary filings.
+              Built for allocation. Grounded in AMFI, LBMA &amp; sovereign yields.
             </h2>
           </div>
           <p className="text-sm text-[#9598A1] max-w-md leading-relaxed">
-            From raw SEC Form 10-K tables to interactive 3D exchange telemetry, every signal inside Financia traces back to verifiable market data.
+            From direct Mutual Fund NAVs and Gilt duration curves to Gold BeES vaults and index ETFs, every signal inside Financia traces back to verifiable primary feeds.
           </p>
         </div>
 
