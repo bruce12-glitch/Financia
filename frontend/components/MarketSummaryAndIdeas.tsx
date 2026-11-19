@@ -260,85 +260,85 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
               </button>
             </div>
 
-            {/* Right: Crypto Market Cap & Dominance */}
+            {/* Right: Global Gold & Allocation Flows */}
             <div className="rounded-2xl border border-[#E0E3EB] bg-white p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2.5 mb-2">
-                  <span className="w-7 h-7 rounded-full bg-[#2962FF] text-white text-xs font-bold flex items-center justify-center">
-                    G
+                  <span className="w-7 h-7 rounded-full bg-[#D97706] text-white text-xs font-bold flex items-center justify-center">
+                    Au
                   </span>
-                  <span className="text-sm font-bold text-[#131722]">Crypto market cap</span>
+                  <span className="text-sm font-bold text-[#131722]">Global Gold &amp; Allocation Flows</span>
                   <span className="text-[11px] font-mono bg-[#F0F3FA] text-[#787B86] px-1.5 py-0.5 rounded">
-                    TOTAL
+                    BULLION &amp; ETF
                   </span>
                 </div>
                 <div className="flex items-baseline gap-2 tabular-nums">
-                  <span className="text-xl font-bold text-[#131722]">2.17T</span>
-                  <span className="text-[11px] text-[#787B86]">USD</span>
-                  <span className="text-xs font-semibold text-[#F23645]">−20.11%</span>
+                  <span className="text-xl font-bold text-[#131722]">$3,284.50</span>
+                  <span className="text-[11px] text-[#787B86]">LBMA Spot Gold / oz</span>
+                  <span className="text-xs font-semibold text-[#089981]">+1.18%</span>
                 </div>
 
                 <svg viewBox="0 0 480 86" className="w-full h-20 mt-2">
                   <path
-                    d={buildSvgAreaPath(CRYPTO_ASSETS[0].sparkline, 480, 76, 8)}
-                    fill="rgba(242, 54, 69, 0.14)"
+                    d={buildSvgAreaPath(GOLD_BULLION_ASSETS[0].sparkline, 480, 76, 8)}
+                    fill="rgba(8, 153, 129, 0.14)"
                   />
                   <path
-                    d={buildSvgPolylinePath(CRYPTO_ASSETS[0].sparkline, 480, 76, 8)}
+                    d={buildSvgPolylinePath(GOLD_BULLION_ASSETS[0].sparkline, 480, 76, 8)}
                     fill="none"
-                    stroke="#F23645"
+                    stroke="#089981"
                     strokeWidth="2"
                   />
-                  <text x="220" y="83" fill="#787B86" fontSize="10">
-                    1 month
+                  <text x="210" y="83" fill="#787B86" fontSize="10">
+                    Spot Trend
                   </text>
                 </svg>
 
                 <div className="mt-4">
-                  <div className="text-xs font-semibold text-[#131722] mb-2">Bitcoin dominance</div>
+                  <div className="text-xs font-semibold text-[#131722] mb-2">Institutional Pillar Share</div>
                   <div className="grid grid-cols-3 text-xs mb-1.5 tabular-nums">
                     <div>
-                      <span className="text-[#2962FF]">●</span> Bitcoin <div className="font-semibold">59.76%</div>
+                      <span className="text-[#D97706]">●</span> Gold &amp; Bullion <div className="font-semibold">42.0%</div>
                     </div>
                     <div>
-                      <span className="text-[#089981]">●</span> Ethereum <div className="font-semibold">10.28%</div>
+                      <span className="text-[#2962FF]">●</span> Mutual Funds <div className="font-semibold">35.5%</div>
                     </div>
                     <div className="text-right">
-                      <span className="text-[#F23645]">●</span> Others <div className="font-semibold">29.96%</div>
+                      <span className="text-[#089981]">●</span> Debt &amp; Gilts <div className="font-semibold">22.5%</div>
                     </div>
                   </div>
                   <div className="w-full h-2 rounded-full overflow-hidden flex bg-[#F0F3FA]">
-                    <div className="bg-[#2962FF] h-full" style={{ width: '59.76%' }} />
-                    <div className="bg-[#089981] h-full" style={{ width: '10.28%' }} />
-                    <div className="bg-[#F23645] h-full" style={{ width: '29.96%' }} />
+                    <div className="bg-[#D97706] h-full" style={{ width: '42.0%' }} />
+                    <div className="bg-[#2962FF] h-full" style={{ width: '35.5%' }} />
+                    <div className="bg-[#089981] h-full" style={{ width: '22.5%' }} />
                   </div>
                 </div>
 
                 <div className="mt-5 space-y-2.5">
-                  {CRYPTO_ASSETS.slice(1, 3).map((coin) => (
+                  {GOLD_BULLION_ASSETS.slice(1, 3).map((asset) => (
                     <button
-                      key={coin.symbol}
+                      key={asset.symbol}
                       type="button"
-                      onClick={() => onSelectSymbol(coin)}
+                      onClick={() => onSelectSymbol(asset)}
                       className="w-full flex items-center justify-between py-1 px-2 -mx-2 rounded-lg hover:bg-[#F8F9FD] transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5">
                         <span
                           className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                          style={{ backgroundColor: coin.badgeColor }}
+                          style={{ backgroundColor: asset.badgeColor }}
                         >
-                          {coin.badgeText}
+                          {asset.badgeText}
                         </span>
                         <div className="text-left">
-                          <div className="text-sm font-semibold text-[#131722]">{coin.name}</div>
+                          <div className="text-sm font-semibold text-[#131722]">{asset.name}</div>
                           <span className="text-[11px] font-mono bg-[#F0F3FA] text-[#787B86] px-1.5 py-0.5 rounded">
-                            {coin.symbol}
+                            {asset.symbol}
                           </span>
                         </div>
                       </div>
                       <div className="text-right tabular-nums">
                         <div className="text-sm font-semibold text-[#131722]">
-                          {coin.price} <span className="text-[10px] text-[#787B86]">{coin.unit}</span>
+                          {asset.price} <span className="text-[10px] text-[#787B86]">{asset.unit}</span>
                         </div>
                         <div className="text-xs font-medium text-[#F23645]">
                           {formatSignedPercent(coin.changePercent)}
