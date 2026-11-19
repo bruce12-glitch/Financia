@@ -385,51 +385,67 @@ export function synthesizeCustomTickerReport(ticker: string, existingStocks: Sto
     };
   });
 
+  const terVal =
+    meta.assetClass === 'ETF'
+      ? Number((0.05 + (hash % 18) / 100).toFixed(2))
+      : meta.assetClass === 'Debt Fund'
+      ? Number((0.28 + (hash % 25) / 100).toFixed(2))
+      : Number((0.48 + (hash % 36) / 100).toFixed(2));
+
+  const ytmOrCagr =
+    meta.assetClass === 'Debt Fund'
+      ? `${(7.05 + (hash % 75) / 100).toFixed(2)}% YTM`
+      : `+${(13.4 + (hash % 90) / 10).toFixed(1)}% 3Y CAGR`;
+
+  const durationOrTracking =
+    meta.assetClass === 'Debt Fund'
+      ? `${(2.8 + (hash % 42) / 10).toFixed(2)} Yrs Mod Dur`
+      : meta.assetClass === 'ETF' || meta.assetClass === 'Gold Bullion'
+      ? `0.0${2 + (hash % 5)}% Tracking Err`
+      : `${(8 + (hash % 10)).toFixed(1)}% Cash Buffer`;
+
   const stance =
-    conviction >= 80
+    conviction >= 82
       ? 'HIGH CONVICTION BULLISH'
-      : conviction >= 68
+      : conviction >= 74
       ? 'MODERATE ACCUMULATE'
       : 'NEUTRAL WATCH';
 
+  const pricePrefix = meta.currencyUnit === 'INR' ? '₹' : '$';
   const report: ReportData = {
     ticker: normalized,
-    companyName: `${normalized} Global Holdings Corp.`,
+    companyName: meta.displayName,
     generatedAt: new Date().toISOString(),
     verdict: {
-      summary: `Multi-agent SEC filing synthesis and live institutional flow telemetry indicate ${normalized} is trading with a ${conviction}/100 conviction profile. Recent 10-Q operating leverage and expanding free-cash-flow conversion support institutional accumulation despite near-term macro rate sensitivity.`,
+      summary: `Financia 4-pillar screening classifies ${normalized} (${meta.assetClass}) at ${conviction}/100 conviction with ${ytmOrCagr} and a disciplined ${terVal.toFixed(2)}% expense ratio. Consistent institutional AUM inflows and ${durationOrTracking} support core multi-asset allocation.`,
       conviction_score: conviction,
       stance,
       key_takeaways: [
-        `Operating margin expanded +180 bps YoY in the most recent Form 10-Q filing, driven by disciplined R&D allocation and recurring enterprise revenue.`,
-        `Options flow telemetry shows a 1.68x Call/Put open-interest ratio concentrated at the $${Math.round(basePrice * 1.1)} strike for next quarterly expiry.`,
-        `Form 13F institutional filings confirm net additions across top-tier quantitative funds over the trailing 90-day disclosure window.`,
+        `Direct Plan Total Expense Ratio of ${terVal.toFixed(2)}% minimizes long-term fee drag relative to regular distributor tiers.`,
+        `Latest AMFI / custodial portfolio disclosure shows $${quarters[3].revenue}B equivalent AUM with +$${quarters[3].net_income}B net quarterly creations.`,
+        `${meta.assetClass === 'Debt Fund' ? '100% High-Grade Sovereign & AAA credit guardrails' : 'Physical/underlying constituent replication'} with ${durationOrTracking}.`,
       ],
     },
     bull_case: [
       {
-        point: 'Accelerating Operating Leverage & Free Cash Flow',
-        evidence: `Latest 10-Q confirms quarterly revenue reaching $${quarters[3].revenue}B with net income scaling to $${quarters[3].net_income}B.`,
+        point: 'Sustained Institutional SIP & ETF Creation Velocity',
+        evidence: `Trailing quarterly AUM expanded to $${quarters[3].revenue}B backed by sticky passive and systemic inflows.`,
       },
       {
-        point: 'Constructive Institutional Options Skew',
-        evidence: '30-day implied volatility skew favors upside call accumulation with muted downside hedging pressure.',
+        point: `${meta.assetClass === 'Debt Fund' ? 'Rate-Cut Duration Convexity' : 'Fee-Efficient Compounding Advantage'}`,
+        evidence: `${ytmOrCagr} paired with a ${terVal.toFixed(2)}% Direct TER delivers strong risk-adjusted Sharpe efficiency.`,
       },
     ],
     bear_case: [
       {
-        point: 'Valuation Multiple Compression Risk',
-        evidence: 'Sustained treasury yield elevation could compress forward EV/EBITDA multiples across growth-indexed peers.',
-      },
-      {
-        point: 'Supply Chain & Capex Intensity',
-        evidence: 'Section 1A Risk Factors highlight elevated capital expenditure commitments scheduled for H2.',
+        point: 'Macro Real-Yield Volatility Sensitivity',
+        evidence: 'Sharp upside surprises in sovereign 10Y yields or CPI could trigger temporary mark-to-market consolidation.',
       },
     ],
     base_case: [
       {
-        point: 'Steady Compounding Within Guidance Corridor',
-        evidence: `Consensus models project 12–15% top-line expansion with share repurchases offsetting dilution near $${basePrice}.`,
+        point: 'Core Multi-Asset Portfolio Compounding Sleeve',
+        evidence: `Projected steady accrual/CAGR trajectory aligned with benchmark TRI and ${durationOrTracking}.`,
       },
     ],
     financial_charts: {
