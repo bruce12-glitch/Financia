@@ -1,20 +1,42 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import type express from 'express';
 import {
   AuthUser,
   deriveDisplayNameAndInitials,
 } from '../../frontend/utils/authEngine.ts';
+import {
+  DEFAULT_STORE_PATH,
+  financiaStore,
+  PersistenceStore,
+  StoredAccountRecord,
+} from './persistenceService.ts';
 
-export interface StoredAccountRecord {
-  user: AuthUser;
-  salt: string;
-  passwordHash: string;
+export type { StoredAccountRecord };
+
+function resolveSessionSecret(): string {
+  if (process.env.AUTH_SESSION_SECRET && process.env.AUTH_SESSION_SECRET.length >= 16) {
+    return process.env.AUTH_SESSION_SECRET;
+  }
+  const secretPath = path.join(path.dirname(DEFAULT_STORE_PATH), '.session-secret');
+  try {
+    if (fs.existsSync(secretPath)) {
+      const existing = fs.readFileSync(secretPath, 'utf8').trim();
+      if (existing.length >= 32) return existing;
+    }
+    const dir = path.dirname(secretPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const generated = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(secretPath, generated, { mode: 0o600 });
+    return generated;
+  } catch {
+    return crypto.randomBytes(32).toString('hex');
+  }
 }
 
-const AUTH_SESSION_SECRET =
-  process.env.AUTH_SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const AUTH_SESSION_SECRET = resolveSessionSecret();
 
-export const accountStore = new Map<string, StoredAccountRecord>();
 export const revokedTokens = new Set<string>();
 
 export function hashPassword(password: string, salt: string): string {
@@ -94,13 +116,17 @@ export function extractBearerOrCookieToken(req: express.Request): string | null 
   return null;
 }
 
-// Seed one demo investor account for immediate Log in evaluation
-export function ensureDemoInvestorAccount(): void {
+export function getAuthenticatedUser(req: express.Request): AuthUser | null {
+  const token = extractBearerOrCookieToken(req);
+  return token ? verifyAuthToken(token) : null;
+}
+
+export function ensureDemoInvestorAccount(store: PersistenceStore = financiaStore): void {
   const email = 'demo@financia.io';
-  if (accountStore.has(email)) return;
+  if (store.hasAccount(email)) return;
   const salt = crypto.randomBytes(16).toString('hex');
   const { displayName, initials } = deriveDisplayNameAndInitials('Demo Investor', email);
-  accountStore.set(email, {
+  store.setAccount(email, {
     user: {
       id: 'usr_demo_financia',
       name: displayName,
@@ -114,4 +140,4 @@ export function ensureDemoInvestorAccount(): void {
   });
 }
 
-ensureDemoInvestorAccount();
+ensureDemoInvestorAccount(financiaStore);
