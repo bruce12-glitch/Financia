@@ -68,7 +68,7 @@ export const SetAlertModal: React.FC<SetAlertModalProps> = ({
 
   if (!target) return null;
 
-  const currencyPrefix = target.unit && target.unit !== 'USD' ? `${target.unit} ` : '$';
+  const currencyPrefix = target.unit?.includes('INR') ? '₹' : target.unit && target.unit !== 'USD' ? `${target.unit} ` : '$';
   const parsedVal = Number(thresholdInput.replace(/,/g, ''));
   const liveDeltaPct =
     Number.isFinite(parsedVal) && parsedVal > 0
@@ -277,7 +277,7 @@ export const SetAlertModal: React.FC<SetAlertModalProps> = ({
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="e.g., Breakout above 50D resistance or earnings support"
+              placeholder="e.g., Gold BeES breakout or Gilt yield support"
               className="w-full px-3.5 py-2 rounded-lg border border-[#E0E3EB] text-xs text-[#131722] placeholder-[#9598A1] focus:outline-none focus:border-[#2962FF]"
             />
           </div>
