@@ -2,6 +2,7 @@ import { parseAlphaVantageDaily } from '../../frontend/utils/liveDataParsers.ts'
 import { SentimentPayload } from '../../frontend/utils/sentimentEngine.ts';
 import { EarningsCalendarEvent } from '../../frontend/utils/earningsEngine.ts';
 import { StockQuote } from '../../frontend/types/financia.ts';
+import { fetchApiNinjasEtfQuote, fetchFmpQuote } from './etfFmpService.ts';
 
 const SEC_USER_AGENT =
   process.env.SEC_USER_AGENT || 'Financia ResearchEngine/1.0 (subashree04116@gmail.com)';
