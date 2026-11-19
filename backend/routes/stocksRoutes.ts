@@ -252,63 +252,296 @@ export function createStocksRouter(): Router {
       return;
     }
 
-    if (sourceLabel === 'financia-research-engine') {
-      const avStock = await fetchAlphaVantageStock(rawTicker, stock);
-      if (avStock) {
-        stock = avStock;
-        sourceLabel = 'alpha-vantage-live';
-      }
-    }
+    const timeframe = normalizeTimeframe(req.query.timeframe);
+    const requestedRsi = Math.min(28, Math.max(2, Number(req.query.rsiPeriod || 14) || 14));
+    const smaPeriod = Math.min(20, Math.max(2, Number(req.query.smaPeriod || 5) || 5));
 
-    if (
-      sourceLabel === 'financia-research-engine' &&
-      process.env.MARKET_DATA_API_KEY &&
-      process.env.MARKET_DATA_BASE_URL
-    ) {
-      try {
-        const upstreamUrl = `${process.env.MARKET_DATA_BASE_URL.replace(
-          /\/$/,
-          ''
-        )}/quote?symbol=${encodeURIComponent(rawTicker)}&token=${encodeURIComponent(
-          process.env.MARKET_DATA_API_KEY
-        )}`;
-        const upstreamRes = await fetchWithTimeout(upstreamUrl);
-        if (upstreamRes.ok) {
-          const payload = (await upstreamRes.json()) as { c?: number; d?: number; dp?: number };
-          stock = mergeFinnhubQuote(payload, stock);
-          if (typeof payload.c === 'number' && payload.c > 0) {
-            stock.dataSource = 'Custom Upstream Live API';
-            sourceLabel = 'live-api';
-          }
-        }
-      } catch {
-        // Keep structured research engine
-      }
-    }
+    const { stock, source } = await enrichStockQuote(check.normalized);
+    const series = getSeriesForTimeframe(stock.report.financial_charts.stock_price_4m, timeframe);
+    const closes = series.map((pt) => pt.price);
 
-    const secMeta = await resolveSecCompanyMeta(rawTicker);
-    if (secMeta) {
-      const secFacts = await fetchSecCompanyFacts(secMeta.cik);
-      if (secFacts) {
-        stock = parseSecCompanyFacts(secFacts, secMeta.cik, secMeta.title, stock);
-        sourceLabel =
-          sourceLabel === 'financia-research-engine'
-            ? 'sec-edgar-live'
-            : `${sourceLabel}+sec-edgar`;
-      } else {
-        stock = {
-          ...stock,
-          cik: secMeta.cik,
-          dataSource: stock.dataSource || `SEC EDGAR CIK ${secMeta.cik}`,
-        };
-      }
-    }
+    const effectiveSma = Math.min(smaPeriod, Math.max(2, closes.length - 1));
+    const effectiveRsiPeriod = getEffectiveRSIPeriod(closes.length, requestedRsi);
+    const sma = calculateSMA(closes, effectiveSma);
+    const bollinger = calculateBollingerBands(closes, effectiveSma, 2);
+    const rsi = calculateRSISeries(closes, effectiveRsiPeriod);
+
+    const latestRsi = rsi.length > 0 ? rsi[rsi.length - 1] : null;
+    const rsiZone = summarizeRSIZone(latestRsi);
 
     res.json({
-      source: sourceLabel,
-      stock,
+      source,
+      ticker: stock.ticker,
+      name: stock.name,
+      assetClass: stock.assetClass || stock.sector,
+      currencyUnit: stock.currencyUnit || 'USD',
+      spotPrice: stock.price,
+      timeframe,
+      requestedRsiPeriod: requestedRsi,
+      effectiveRsiPeriod,
+      smaPeriod: effectiveSma,
+      latestRsi,
+      rsiZone,
+      points: series.map((pt, idx) => ({
+        date: pt.date,
+        price: pt.price,
+        volume: pt.volume,
+        sma: sma[idx] ?? null,
+        bollingerUpper: bollinger[idx]?.upper ?? null,
+        bollingerMiddle: bollinger[idx]?.middle ?? null,
+        bollingerLower: bollinger[idx]?.lower ?? null,
+        rsi: rsi[idx] ?? null,
+      })),
     });
+  };
+
+  router.get('/funds/technicals/:ticker', handleTechnicals);
+  router.get('/stocks/technicals/:ticker', handleTechnicals);
+
+  const handleCompare = async (req: Request, res: Response) => {
+    const primaryCheck = validateTickerInput(String(req.query.primary || 'GOLDBEES'));
+    if (!primaryCheck.valid) {
+      res.status(400).json({ error: primaryCheck.error || 'Invalid primary symbol.' });
+      return;
+    }
+
+    const rawSecondary = String(req.query.secondary || '').trim();
+    const secondarySymbols = rawSecondary
+      ? Array.from(
+          new Set(
+            rawSecondary
+              .split(',')
+              .map((s) => s.trim().toUpperCase())
+              .filter((s) => s && s !== primaryCheck.normalized && validateTickerInput(s).valid)
+          )
+        ).slice(0, 4)
+      : [];
+
+    const timeframe = normalizeTimeframe(req.query.timeframe);
+    const requestedRsi = Math.min(28, Math.max(2, Number(req.query.rsiPeriod || 14) || 14));
+
+    const [primaryResult, ...secondaryResults] = await Promise.all([
+      enrichStockQuote(primaryCheck.normalized),
+      ...secondarySymbols.map((sym) => enrichStockQuote(sym)),
+    ]);
+
+    const comparison = buildMultiTickerComparisonSeries(
+      primaryResult.stock,
+      secondaryResults.map((r) => r.stock),
+      timeframe,
+      requestedRsi
+    );
+
+    res.json({
+      source: primaryResult.source,
+      timeframe,
+      requestedRsiPeriod: requestedRsi,
+      comparison,
+    });
+  };
+
+  router.get('/funds/compare', handleCompare);
+  router.get('/stocks/compare', handleCompare);
+
+  // Full AMFI Mutual Fund API (https://api.mfapi.in) Endpoints
+  router.get('/mf/search', async (req, res) => {
+    const query = String(req.query.q || '').trim();
+    const result = await searchAmfiSchemes(query);
+    res.json(result);
+  });
+
+  router.get('/mf', async (req, res) => {
+    const limit = Number(req.query.limit || 50);
+    const offset = Number(req.query.offset || 0);
+    const result = await listAmfiSchemes(limit, offset);
+    res.json(result);
+  });
+
+  router.get('/mf/:schemeCode/latest', async (req, res) => {
+    const code = String(req.params.schemeCode || '').trim();
+    if (!/^\d{4,8}$/.test(code)) {
+      res.status(400).json({ error: 'Valid numeric AMFI scheme_code required (e.g., 125497).' });
+      return;
+    }
+    const result = await fetchAmfiSchemeLatest(code);
+    res.json(result);
+  });
+
+  router.get('/mf/:schemeCode', async (req, res) => {
+    const code = String(req.params.schemeCode || '').trim();
+    if (!/^\d{4,8}$/.test(code)) {
+      res.status(400).json({ error: 'Valid numeric AMFI scheme_code required (e.g., 125497).' });
+      return;
+    }
+    const result = await fetchAmfiSchemeHistory(code);
+    res.json(result);
+  });
+
+  // mfnav.in AMFI Scheme, ISIN & Risk Analytics API (120 req/min zero-key)
+  router.get('/mfnav/search', async (req, res) => {
+    const result = await searchMfnavFunds({
+      q: typeof req.query.q === 'string' ? req.query.q : undefined,
+      category: typeof req.query.category === 'string' ? req.query.category : undefined,
+      page: Number(req.query.page || 1),
+      pageSize: Number(req.query.page_size || 25),
+    });
+    res.json(result);
+  });
+
+  router.get('/mfnav/categories', async (_req, res) => {
+    const result = await fetchMfnavCategories();
+    res.json(result);
+  });
+
+  router.get('/mfnav/date/latest', async (_req, res) => {
+    const result = await fetchMfnavDateLatest();
+    res.json(result);
+  });
+
+  router.get('/mfnav/nav/:codeOrIsin', async (req, res) => {
+    const key = String(req.params.codeOrIsin || '').trim();
+    if (!/^[A-Za-z0-9]{4,16}$/.test(key)) {
+      res.status(400).json({ error: 'Valid scheme_code or ISIN required (e.g., 100641 or INF200K01LJ4).' });
+      return;
+    }
+    const result = await fetchMfnavNavSeriesRaw(key, {
+      startDate: typeof req.query.start_date === 'string' ? req.query.start_date : undefined,
+      endDate: typeof req.query.end_date === 'string' ? req.query.end_date : undefined,
+      page: req.query.page ? Number(req.query.page) : 1,
+      pageSize: req.query.page_size ? Number(req.query.page_size) : 30,
+    });
+    res.json(result);
+  });
+
+  router.get('/mfnav/fund/:codeOrPlan/:option', async (req, res) => {
+    const plan = String(req.params.codeOrPlan || '').trim();
+    const option = String(req.params.option || '').trim();
+    if (!/^[A-Za-z0-9_-]{2,24}$/.test(plan) || !/^[A-Za-z0-9_-]{2,24}$/.test(option)) {
+      res.status(400).json({ error: 'Invalid plan/option path parameters.' });
+      return;
+    }
+    const result = await fetchMfnavFundRaw(`${encodeURIComponent(plan)}/${encodeURIComponent(option)}`);
+    res.status(result.status).json({ source: result.source, payload: result.payload });
+  });
+
+  router.get('/mfnav/fund/:codeOrIsin', async (req, res) => {
+    const key = String(req.params.codeOrIsin || '').trim();
+    if (!/^[A-Za-z0-9_-]{2,24}$/.test(key)) {
+      res.status(400).json({ error: 'Valid scheme_code, ISIN, or plan required.' });
+      return;
+    }
+    const result = await fetchMfnavFundRaw(encodeURIComponent(key));
+    res.status(result.status).json({ source: result.source, payload: result.payload });
+  });
+
+  // API Ninjas ETF API + FMP Stable ETF, Sovereign Yield Curve, Bullion & Macro Routes
+  router.get('/etf/list', async (req, res) => {
+    const provider = String(req.query.provider || 'ninjas').toLowerCase();
+    if (provider === 'fmp') {
+      const fmpRes = await fetchFmpEndpoint('etf-list');
+      res.json(fmpRes);
+      return;
+    }
+    const offset = Number(req.query.offset || 0);
+    const result = await fetchApiNinjasEtfList(offset);
+    res.json(result);
+  });
+
+  router.get('/etf/search', async (req, res) => {
+    const result = await searchApiNinjasEtfs({
+      name: typeof req.query.name === 'string' ? req.query.name : undefined,
+      min_aum: typeof req.query.min_aum === 'string' ? req.query.min_aum : undefined,
+      max_aum: typeof req.query.max_aum === 'string' ? req.query.max_aum : undefined,
+      min_expense_ratio: typeof req.query.min_expense_ratio === 'string' ? req.query.min_expense_ratio : undefined,
+      max_expense_ratio: typeof req.query.max_expense_ratio === 'string' ? req.query.max_expense_ratio : undefined,
+      holdings: typeof req.query.holdings === 'string' ? req.query.holdings : undefined,
+      country: typeof req.query.country === 'string' ? req.query.country : undefined,
+      offset: req.query.offset ? Number(req.query.offset) : 0,
+    });
+    res.json(result);
+  });
+
+  router.get('/etf/detail/:symbolOrIsin', async (req, res) => {
+    const sym = String(req.params.symbolOrIsin || 'GOLDBEES').trim().toUpperCase();
+    if (!/^[A-Z0-9.^-]{1,16}$/.test(sym)) {
+      res.status(400).json({ error: 'Invalid ETF ticker or ISIN.' });
+      return;
+    }
+    const dossier = await fetchCombinedEtfDossier(sym);
+    res.json(dossier);
+  });
+
+  router.get('/etf/holdings/:symbol', async (req, res) => {
+    const sym = String(req.params.symbol || 'SPY').trim().toUpperCase();
+    const result = await fetchFmpEndpoint('etf/holdings', { symbol: sym });
+    res.json({ symbol: sym, ...result });
+  });
+
+  router.get('/etf/weightings/:symbol', async (req, res) => {
+    const sym = String(req.params.symbol || 'SPY').trim().toUpperCase();
+    const [sectors, countries] = await Promise.all([
+      fetchFmpEndpoint('etf/sector-weightings', { symbol: sym }),
+      fetchFmpEndpoint('etf/country-weightings', { symbol: sym }),
+    ]);
+    res.json({
+      symbol: sym,
+      sectorWeightings: sectors.data,
+      countryWeightings: countries.data,
+      source: sectors.source,
+    });
+  });
+
+  router.get('/fmp/isin/:isin', async (req, res) => {
+    const isin = String(req.params.isin || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{10,16}$/.test(isin)) {
+      res.status(400).json({ error: 'Valid ISIN identifier required.' });
+      return;
+    }
+    const result = await fetchFmpEndpoint('search-isin', { isin });
+    res.json({ isin, ...result });
+  });
+
+  router.get('/fmp/funds/disclosures', async (req, res) => {
+    const name = typeof req.query.name === 'string' ? req.query.name.trim() : '';
+    if (name) {
+      const result = await fetchFmpEndpoint('funds/disclosure-holders-search', { name });
+      res.json(result);
+      return;
+    }
+    const symbol = String(req.query.symbol || 'GLD').trim().toUpperCase();
+    const year = String(req.query.year || '2025');
+    const quarter = String(req.query.quarter || '4');
+    const result = await fetchFmpEndpoint('funds/disclosure', { symbol, year, quarter });
+    res.json({ symbol, year, quarter, ...result });
+  });
+
+  router.get('/fmp/batch/etfs', async (_req, res) => {
+    res.json(await fetchFmpEndpoint('batch-etf-quotes'));
+  });
+
+  router.get('/fmp/batch/mutual-funds', async (_req, res) => {
+    res.json(await fetchFmpEndpoint('batch-mutualfund-quotes'));
+  });
+
+  router.get('/fmp/batch/commodities', async (_req, res) => {
+    res.json(await fetchFmpEndpoint('batch-commodity-quotes'));
+  });
+
+  router.get('/fmp/batch/forex', async (_req, res) => {
+    res.json(await fetchFmpEndpoint('batch-forex-quotes', { short: 'true' }));
+  });
+
+  router.get('/macro/treasury-rates', async (_req, res) => {
+    const curve = await fetchTreasuryYieldCurve();
+    res.json(curve);
+  });
+
+  router.get('/macro/indicators', async (req, res) => {
+    const name = String(req.query.name || 'CPI').trim();
+    const result = await fetchFmpEndpoint('economic-indicators', { name });
+    res.json({ indicator: name, ...result });
   });
 
   return router;
 }
+
