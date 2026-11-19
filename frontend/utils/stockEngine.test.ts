@@ -10,6 +10,12 @@ import {
   formatCurrency,
   getSeriesForTimeframe,
   synthesizeCustomTickerReport,
+  buildThirtyDayPerformanceSeries,
+  summarizeThirtyDayPerformance,
+  calculateRSISeries,
+  getEffectiveRSIPeriod,
+  summarizeRSIZone,
+  buildMultiTickerComparisonSeries,
 } from './stockEngine';
 
 test('calculateSMA computes accurate rolling averages and nulls for warm-up window', () => {
@@ -44,21 +50,21 @@ test('calculateRSI bounds output between 0 and 100', () => {
   assert.ok(rsi > 50 && rsi < 90);
 });
 
-test('validateTickerInput rejects empty or malformed symbols and normalizes valid tickers', () => {
+test('validateTickerInput rejects empty or malformed symbols and normalizes valid 4-pillar symbols', () => {
   const emptyRes = validateTickerInput('   ');
   assert.equal(emptyRes.valid, false);
   assert.ok(emptyRes.error);
 
-  const invalidRes = validateTickerInput('NVDA$$$');
+  const invalidRes = validateTickerInput('GOLDBEES$$$');
   assert.equal(invalidRes.valid, false);
 
-  const validRes = validateTickerInput(' nvda ');
+  const validRes = validateTickerInput(' ppfas ');
   assert.equal(validRes.valid, true);
-  assert.equal(validRes.normalized, 'NVDA');
+  assert.equal(validRes.normalized, 'PPFAS');
 
-  const dotTicker = validateTickerInput('brk.b');
-  assert.equal(dotTicker.valid, true);
-  assert.equal(dotTicker.normalized, 'BRK.B');
+  const dashTicker = validateTickerInput('SGB-S4');
+  assert.equal(dashTicker.valid, true);
+  assert.equal(dashTicker.normalized, 'SGB-S4');
 });
 
 test('validateInquiryForm validates name, email, phone, and message length', () => {
