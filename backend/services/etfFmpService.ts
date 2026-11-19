@@ -111,3 +111,116 @@ export async function fetchApiNinjasEtfDetail(
       : { symbol: key, name: `${key} Index ETF` },
   };
 }
+
+export async function fetchApiNinjasEtfQuote(
+  ticker: string,
+  baseQuote: StockQuote
+): Promise<StockQuote | null> {
+  if (!process.env.API_NINJAS_KEY) return null;
+  const { source, payload } = await fetchApiNinjasEtfDetail(ticker);
+  if (source !== 'api-ninjas-etf-live') return null;
+  return parseApiNinjasEtfDetail(payload, baseQuote);
+}
+
+export async function fetchApiNinjasEtfList(offset = 0): Promise<{
+  source: string;
+  offset: number;
+  tickers: string[];
+}> {
+  const safeOffset = Math.max(0, Math.floor(offset) || 0);
+  const apiKey = process.env.API_NINJAS_KEY;
+  if (apiKey) {
+    try {
+      const { ok, data } = await fetchJsonWithTimeout(
+        `https://api.api-ninjas.com/v1/etflist?offset=${safeOffset}`,
+        { headers: { 'X-Api-Key': apiKey, Accept: 'application/json' } }
+      );
+      if (ok && Array.isArray(data) && data.length > 0) {
+        return { source: 'api-ninjas-etf-live', offset: safeOffset, tickers: data as string[] };
+      }
+    } catch {
+      // Fallback cleanly
+    }
+  }
+  return {
+    source: 'financia-curated-etf',
+    offset: safeOffset,
+    tickers: CURATED_ETF_CATALOG.map((e) => e.symbol),
+  };
+}
+
+export async function searchApiNinjasEtfs(params: {
+  name?: string;
+  min_aum?: string;
+  max_aum?: string;
+  min_expense_ratio?: string;
+  max_expense_ratio?: string;
+  holdings?: string;
+  country?: string;
+  offset?: number;
+}): Promise<{ source: string; results: unknown[] }> {
+  const apiKey = process.env.API_NINJAS_KEY;
+  const qs = new URLSearchParams();
+  if (params.name) qs.set('name', params.name);
+  if (params.min_aum) qs.set('min_aum', params.min_aum);
+  if (params.max_aum) qs.set('max_aum', params.max_aum);
+  if (params.min_expense_ratio) qs.set('min_expense_ratio', params.min_expense_ratio);
+  if (params.max_expense_ratio) qs.set('max_expense_ratio', params.max_expense_ratio);
+  if (params.holdings) qs.set('holdings', params.holdings);
+  if (params.country) qs.set('country', params.country);
+  if (params.offset) qs.set('offset', String(Math.max(0, Math.floor(params.offset))));
+  if (!qs.toString()) qs.set('country', 'US');
+
+  if (apiKey) {
+    try {
+      const { ok, data } = await fetchJsonWithTimeout(
+        `https://api.api-ninjas.com/v1/etfsearch?${qs.toString()}`,
+        { headers: { 'X-Api-Key': apiKey, Accept: 'application/json' } }
+      );
+      if (ok && Array.isArray(data) && data.length > 0) {
+        return { source: 'api-ninjas-etf-live', results: data };
+      }
+    } catch {
+      // Fallback cleanly
+    }
+  }
+
+  const nameNeedle = (params.name || '').trim().toLowerCase();
+  const minAum = params.min_aum ? Number(params.min_aum) : 0;
+  const maxAum = params.max_aum ? Number(params.max_aum) : Number.POSITIVE_INFINITY;
+  const maxEr = params.max_expense_ratio ? Number(params.max_expense_ratio) : Number.POSITIVE_INFINITY;
+  const countryFilter = (params.country || '').trim().toUpperCase();
+
+  const filtered = CURATED_ETF_CATALOG.filter((etf) => {
+    if (nameNeedle && !etf.name.toLowerCase().includes(nameNeedle) && !etf.symbol.toLowerCase().includes(nameNeedle)) {
+      return false;
+    }
+    if (Number.isFinite(minAum) && etf.aum_usd < minAum) return false;
+    if (Number.isFinite(maxAum) && etf.aum_usd > maxAum) return false;
+    if (Number.isFinite(maxEr) && etf.expense_ratio > maxEr) return false;
+    if (countryFilter && etf.country !== countryFilter) return false;
+    return true;
+  });
+
+  return { source: 'financia-curated-etf', results: filtered };
+}
+
+export async function fetchFmpEndpoint(
+  endpointPath: string,
+  extraQuery: Record<string, string | number | undefined> = {}
+): Promise<{ source: string; data: unknown }> {
+  const apiKey = process.env.FMP_API_KEY;
+  if (!apiKey) {
+    return { source: 'fmp-key-missing', data: null };
+  }
+
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(extraQuery)) {
+    if (v !== undefined && String(v).trim() !== '') {
+      qs.set(k, String(v).trim());
+    }
+  }
+  qs.set('apikey', apiKey);
+
+  const cleanPath = endpointPath.replace(/^\/+/, '');
+  try {
