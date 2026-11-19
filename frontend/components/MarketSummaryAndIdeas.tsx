@@ -2,15 +2,15 @@ import React, { useMemo, useState } from 'react';
 import { ChevronRight, MessageSquare, Rocket } from 'lucide-react';
 import {
   COMMUNITY_IDEAS,
-  CRYPTO_ASSETS,
-  CRYPTO_NEWS,
-  FEATURED_IPOS,
+  DEBT_FUND_LEADERS,
+  FEATURED_NFO_AND_SGB,
   FOREX_NEWS,
-  FUTURES_NEWS,
+  GOLD_BULLION_ASSETS,
+  GOLD_DEBT_NEWS,
   INDICATOR_SCRIPTS,
-  INDIAN_STOCKS_NEWS,
   MACRO_SPARK_ROWS,
   MAJOR_INDICES,
+  MUTUAL_FUND_NEWS,
   TOP_STORIES,
 } from '../data/tradingViewData';
 import {
@@ -26,29 +26,39 @@ interface MarketSummaryAndIdeasProps {
   onSelectSymbol: (row: MarketSymbolRow) => void;
   onSelectNews: (item: WireNewsItem) => void;
   onSelectIdea: (idea: CommunityIdeaItem) => void;
+  liveFeedActive?: boolean;
 }
 
 export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
   onSelectSymbol,
   onSelectNews,
   onSelectIdea,
+  liveFeedActive = true,
 }) => {
-  const [featuredSymbol, setFeaturedSymbol] = useState<string>('NIFTY');
+  const [featuredSymbol, setFeaturedSymbol] = useState<string>('GOLDBEES');
   const [ideasTab, setIdeasTab] = useState<'editors' | 'popular'>('editors');
   const [scriptsTab, setScriptsTab] = useState<'editors' | 'popular'>('editors');
   const [showAllStories, setShowAllStories] = useState<boolean>(false);
 
   const featuredAsset = useMemo(() => {
-    return MAJOR_INDICES.find((m) => m.symbol === featuredSymbol) || MAJOR_INDICES[0];
+    return MAJOR_INDICES.find((m) => m.symbol === featuredSymbol) || MAJOR_INDICES[1] || MAJOR_INDICES[0];
   }, [featuredSymbol]);
+
+  const featuredSparkBounds = useMemo(() => {
+    const vals = featuredAsset.sparkline || [];
+    if (vals.length === 0) return { min: 0, mid: 0, max: 0 };
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const mid = (min + max) / 2;
+    return { min, mid, max };
+  }, [featuredAsset.sparkline]);
 
   const aggregatedNews = useMemo(
     () => [
       ...TOP_STORIES,
-      ...INDIAN_STOCKS_NEWS,
-      ...CRYPTO_NEWS,
+      ...MUTUAL_FUND_NEWS,
+      ...GOLD_DEBT_NEWS,
       ...FOREX_NEWS,
-      ...FUTURES_NEWS,
     ],
     []
   );
@@ -81,22 +91,19 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
   }, [scriptsTab]);
 
   const isFeaturedPositive = featuredAsset.changePercent >= 0;
-  const heroStrokeColor = featuredAsset.symbol === 'NIFTY' ? '#F23645' : isFeaturedPositive ? '#089981' : '#F23645';
-  const heroFillColor =
-    featuredAsset.symbol === 'NIFTY'
-      ? 'rgba(242, 54, 69, 0.14)'
-      : isFeaturedPositive
-        ? 'rgba(8, 153, 129, 0.14)'
-        : 'rgba(242, 54, 69, 0.14)';
+  const heroStrokeColor = isFeaturedPositive ? '#089981' : '#F23645';
+  const heroFillColor = isFeaturedPositive
+    ? 'rgba(8, 153, 129, 0.14)'
+    : 'rgba(242, 54, 69, 0.14)';
 
   return (
     <div id="market-summary" className="bg-white text-[#131722] pb-14">
       <div className="max-w-[1260px] mx-auto px-4 md:px-8 space-y-14">
-        {/* 1. Market Summary Heading & Hero Nifty 50 Card */}
+        {/* 1. Market Summary Heading & Hero 4-Pillar Card */}
         <section aria-label="Market summary">
           <button
             type="button"
-            onClick={() => setFeaturedSymbol('NIFTY')}
+            onClick={() => setFeaturedSymbol('GOLDBEES')}
             className="inline-flex items-center gap-1 text-2xl md:text-[28px] font-display font-bold text-[#131722] hover:text-[#2962FF] transition-colors mb-5 cursor-pointer"
           >
             <span>Market summary</span>
@@ -177,13 +184,13 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
                   strokeWidth="2.2"
                 />
                 <text x="1048" y="45" fill="#787B86" fontSize="11" fontFamily="monospace">
-                  25,320.00
+                  {featuredSparkBounds.max.toFixed(2)}
                 </text>
                 <text x="1048" y="102" fill="#787B86" fontSize="11" fontFamily="monospace">
-                  25,280.00
+                  {featuredSparkBounds.mid.toFixed(2)}
                 </text>
                 <text x="1048" y="158" fill="#787B86" fontSize="11" fontFamily="monospace">
-                  25,230.00
+                  {featuredSparkBounds.min.toFixed(2)}
                 </text>
               </svg>
             </div>
@@ -198,13 +205,13 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
             }}
           />
 
-          {/* 2-Column Paired Grid: Major Indices & Crypto Market Cap (PDF Page 3) */}
+          {/* 2-Column Paired Grid: Core ETFs & Benchmarks + Global Gold & Allocation Flows */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-            {/* Left: Major Indices */}
+            {/* Left: Core ETFs & Benchmarks */}
             <div className="rounded-2xl border border-[#E0E3EB] bg-white p-5">
-              <h3 className="text-base font-bold text-[#131722] mb-4">Major indices</h3>
+              <h3 className="text-base font-bold text-[#131722] mb-4">Core ETFs &amp; Benchmarks</h3>
               <div className="space-y-3">
-                {MAJOR_INDICES.slice(1).map((item) => (
+                {MAJOR_INDICES.slice(0, 6).map((item) => (
                   <button
                     key={item.symbol}
                     type="button"
@@ -248,7 +255,7 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
                 onClick={() => onSelectSymbol(MAJOR_INDICES[0])}
                 className="mt-4 text-xs font-semibold text-[#2962FF] hover:underline inline-flex items-center gap-0.5 cursor-pointer"
               >
-                <span>See all major indices</span>
+                <span>Inspect NIFTYBEES</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
