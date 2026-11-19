@@ -108,3 +108,113 @@ export async function generateTickerResearchWithGemini(params: {
             },
             key_takeaways: {
               type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: '3 concise institutional takeaways.',
+            },
+            bull_case: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  point: { type: Type.STRING },
+                  evidence: { type: Type.STRING },
+                },
+              },
+            },
+            bear_case: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  point: { type: Type.STRING },
+                  evidence: { type: Type.STRING },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const rawText = (response.text ?? '').trim();
+    if (!rawText) {
+      throw new GeminiUpstreamError('Gemini returned an empty response payload.');
+    }
+
+    const parsed = JSON.parse(rawText) as Partial<GeminiResearchAnalysis>;
+    return {
+      conviction_score: Math.max(
+        1,
+        Math.min(100, Math.round(Number(parsed.conviction_score) || stock.convictionScore))
+      ),
+      stance: String(parsed.stance || stock.report.verdict.stance),
+      summary: String(parsed.summary || stock.report.verdict.summary),
+      key_takeaways: Array.isArray(parsed.key_takeaways)
+        ? parsed.key_takeaways.slice(0, 4).map(String)
+        : [],
+      bull_case: Array.isArray(parsed.bull_case)
+        ? parsed.bull_case.slice(0, 3).map((b) => ({
+            point: String(b?.point || ''),
+            evidence: String(b?.evidence || ''),
+          }))
+        : [],
+      bear_case: Array.isArray(parsed.bear_case)
+        ? parsed.bear_case.slice(0, 3).map((b) => ({
+            point: String(b?.point || ''),
+            evidence: String(b?.evidence || ''),
+          }))
+        : [],
+    };
+  } catch (err) {
+    if (err instanceof GeminiConfigError || err instanceof GeminiUpstreamError) {
+      throw err;
+    }
+    const message = err instanceof Error ? err.message : 'Upstream Gemini request failed.';
+    const statusCode = /429|RESOURCE_EXHAUSTED/i.test(message)
+      ? 429
+      : /403|PERMISSION_DENIED/i.test(message)
+        ? 403
+        : 502;
+    throw new GeminiUpstreamError(message, statusCode);
+  }
+}
+
+export async function generatePortfolioBriefWithGemini(params: {
+  portfolioName: string;
+  totalNetWorth: number;
+  xirr: number;
+  holdingsSummary: string;
+  question: string;
+}): Promise<string> {
+  const ai = createGeminiClient();
+
+  const prompt = [
+    `Portfolio Snapshot: ${params.portfolioName}`,
+    `Total Net Worth: ${params.totalNetWorth}, XIRR: ${params.xirr}%`,
+    `Holdings & Risk Summary: ${params.holdingsSummary}`,
+    `User Question: ${params.question}`,
+    'Respond in 3-4 concise, factual sentences highlighting diversification, concentration risks, and actionable portfolio considerations.',
+  ].join('\n');
+
+  try {
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: prompt,
+      config: {
+        systemInstruction:
+          'You are Financia Portfolio Diagnostics AI. Keep responses concise, quantitative, and strictly grounded in the supplied portfolio snapshot.',
+      },
+    });
+    const text = (response.text ?? '').trim();
+    if (!text) {
+      throw new GeminiUpstreamError('Gemini returned an empty portfolio analysis.');
+    }
+    return text;
+  } catch (err) {
+    if (err instanceof GeminiConfigError || err instanceof GeminiUpstreamError) {
+      throw err;
+    }
+    const message = err instanceof Error ? err.message : 'Upstream Gemini portfolio request failed.';
+    throw new GeminiUpstreamError(message, 502);
+  }
+}
