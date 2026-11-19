@@ -12,11 +12,11 @@ import {
   scoreToNeedleAngle,
 } from './sentimentEngine';
 import {
-  CRYPTO_ASSETS,
-  CRYPTO_NEWS,
-  INDIAN_STOCKS_NEWS,
+  GOLD_BULLION_ASSETS,
+  GOLD_DEBT_NEWS,
   MACRO_SPARK_ROWS,
   MAJOR_INDICES,
+  MUTUAL_FUND_NEWS,
   TOP_STORIES,
 } from '../data/tradingViewData';
 
@@ -82,12 +82,12 @@ test('buildDeterministicHistory90d and getSentimentHistoryWindow slice 7d, 30d, 
 });
 
 test('classifyHeadlineSentiment and computeNewsVolumeSignals score news velocity and tone accurately', () => {
-  assert.equal(classifyHeadlineSentiment('Nvidia shares surge to record high after earnings beat'), 'bullish');
-  assert.equal(classifyHeadlineSentiment('Bitcoin sinks to fresh low amid heavy liquidation dump'), 'bearish');
+  assert.equal(classifyHeadlineSentiment('Spot gold surges to record high on central-bank ETF inflows'), 'bullish');
+  assert.equal(classifyHeadlineSentiment('Long-duration gilt funds slump on yield pressure and selloff'), 'bearish');
   assert.equal(classifyHeadlineSentiment('Central bank releases quarterly policy schedule'), 'neutral');
 
   const newsSignals = computeNewsVolumeSignals(
-    [...TOP_STORIES, ...CRYPTO_NEWS, ...INDIAN_STOCKS_NEWS],
+    [...TOP_STORIES, ...GOLD_DEBT_NEWS, ...MUTUAL_FUND_NEWS],
     'global'
   );
   assert.ok(newsSignals.totalArticles >= 10);
@@ -109,9 +109,9 @@ test('computeCompositeMarketSentiment integrates wire news volume and price tren
 
   const payload = computeCompositeMarketSentiment({
     indices: MAJOR_INDICES,
-    crypto: CRYPTO_ASSETS,
+    crypto: GOLD_BULLION_ASSETS,
     macro: MACRO_SPARK_ROWS,
-    news: [...TOP_STORIES, ...CRYPTO_NEWS, ...INDIAN_STOCKS_NEWS],
+    news: [...TOP_STORIES, ...GOLD_DEBT_NEWS, ...MUTUAL_FUND_NEWS],
     liveCryptoFng: {
       currentScore: 71,
       previousClose: 68,
@@ -121,7 +121,7 @@ test('computeCompositeMarketSentiment integrates wire news volume and price tren
       history90d: sample90,
       classification: 'Greed',
     },
-    liveBtcChangePercent: 3.4,
+    liveBtcChangePercent: 1.4,
     isLive: true,
     nowIso: '2026-11-16T16:35:00.000Z',
   });
@@ -130,7 +130,7 @@ test('computeCompositeMarketSentiment integrates wire news volume and price tren
   assert.equal(payload.scopes.crypto.score, 71);
   assert.equal(payload.scopes.crypto.zone, 'Greed');
   assert.equal(payload.scopes.crypto.deltaFromClose, 3);
-  assert.equal(payload.scopes.crypto.sourceLabel, 'Alternative.me Live F&G');
+  assert.equal(payload.scopes.crypto.sourceLabel, 'Live LBMA Spot & Macro Pulse');
   assert.equal(payload.scopes.crypto.history90d.length, 90);
   assert.ok(payload.scopes.global.newsSignals.totalArticles >= 10);
 
