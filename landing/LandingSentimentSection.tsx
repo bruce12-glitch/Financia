@@ -2,10 +2,10 @@ import React, { useMemo } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { FearGreedGauge } from '../frontend/components/FearGreedGauge';
 import {
-  CRYPTO_NEWS,
   FOREX_NEWS,
   FUTURES_NEWS,
-  INDIAN_STOCKS_NEWS,
+  GOLD_DEBT_NEWS,
+  MUTUAL_FUND_NEWS,
   TOP_STORIES,
 } from '../frontend/data/tradingViewData';
 import { WireNewsItem } from '../frontend/types/markets';
@@ -22,8 +22,8 @@ export const LandingSentimentSection: React.FC<LandingSentimentSectionProps> = (
   const aggregatedNews = useMemo(
     () => [
       ...TOP_STORIES,
-      ...INDIAN_STOCKS_NEWS,
-      ...CRYPTO_NEWS,
+      ...MUTUAL_FUND_NEWS,
+      ...GOLD_DEBT_NEWS,
       ...FOREX_NEWS,
       ...FUTURES_NEWS,
     ],
