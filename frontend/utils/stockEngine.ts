@@ -97,7 +97,60 @@ export function calculateRSI(prices: number[], period = 14): number {
 }
 
 /**
- * Validates a stock or ETF ticker input string.
+ * Calculates a rolling Relative Strength Index (RSI) series across an array of prices.
+ * Returns null for indices during the warm-up period (< period).
+ */
+export function calculateRSISeries(prices: number[], period = 4): (number | null)[] {
+  if (period <= 0) {
+    throw new Error('Period must be greater than 0');
+  }
+  if (!prices || prices.length === 0) return [];
+
+  return prices.map((_, idx) => {
+    if (idx < period) return null;
+    let gains = 0;
+    let losses = 0;
+    for (let i = idx - period + 1; i <= idx; i++) {
+      const delta = prices[i] - prices[i - 1];
+      if (delta >= 0) gains += delta;
+      else losses += Math.abs(delta);
+    }
+    const avgGain = gains / period;
+    const avgLoss = losses / period;
+    if (avgGain === 0 && avgLoss === 0) return 50;
+    if (avgLoss === 0) return 100;
+    const rs = avgGain / avgLoss;
+    const rsi = 100 - 100 / (1 + rs);
+    return Number(Math.max(0, Math.min(100, rsi)).toFixed(1));
+  });
+}
+
+/**
+ * Adapts a requested RSI lookback period to a chart series length so every timeframe renders a curve.
+ */
+export function getEffectiveRSIPeriod(seriesLength: number, requestedPeriod: number): number {
+  if (seriesLength <= 2) return 1;
+  return Math.max(2, Math.min(requestedPeriod, seriesLength - 2));
+}
+
+export function summarizeRSIZone(rsi: number | null): {
+  label: 'Overbought' | 'Neutral' | 'Oversold' | 'Warm-up';
+  color: string;
+} {
+  if (rsi === null || !Number.isFinite(rsi)) {
+    return { label: 'Warm-up', color: '#6B7280' };
+  }
+  if (rsi >= 70) {
+    return { label: 'Overbought', color: '#DC2626' };
+  }
+  if (rsi <= 30) {
+    return { label: 'Oversold', color: '#089981' };
+  }
+  return { label: 'Neutral', color: '#7C3AED' };
+}
+
+/**
+ * Validates a Mutual Fund, Gold, Debt Fund, or ETF symbol input string.
  */
 export function validateTickerInput(raw: string): {
   valid: boolean;
@@ -106,13 +159,17 @@ export function validateTickerInput(raw: string): {
 } {
   const trimmed = raw.trim().toUpperCase();
   if (!trimmed) {
-    return { valid: false, normalized: '', error: 'Please enter a valid stock or ETF ticker symbol (e.g., NVDA, AAPL, MSFT).' };
+    return {
+      valid: false,
+      normalized: '',
+      error: 'Please enter a valid Mutual Fund, ISIN, Gold, Debt Fund, or ETF symbol (e.g., GOLDBEES, PPFAS, SBIGILT, NIFTYBEES, INF200K01LJ4).',
+    };
   }
-  if (!/^[A-Z0-9.^]{1,10}$/.test(trimmed)) {
+  if (!/^[A-Z0-9.^-]{1,14}$/.test(trimmed)) {
     return {
       valid: false,
       normalized: trimmed,
-      error: 'Ticker symbols must be 1–10 alphanumeric characters (e.g., NVDA, BRK.B, QQQ).',
+      error: 'Symbols must be 1–14 alphanumeric characters (e.g., GOLDBEES, PPFAS, INF200K01LJ4, AGG).',
     };
   }
   return { valid: true, normalized: trimmed };
@@ -149,12 +206,18 @@ export function validateInquiryForm(input: {
 }
 
 /**
- * Formats a numeric price as USD currency string.
+ * Formats a numeric price as USD ($) or INR (₹) currency string.
  */
-export function formatCurrency(value: number, decimals = 2): string {
+export function formatCurrency(
+  value: number,
+  decimals = 2,
+  currency: 'USD' | 'INR' = 'USD'
+): string {
   const sign = value < 0 ? '-' : '';
   const abs = Math.abs(value);
-  return `${sign}$${abs.toLocaleString('en-US', {
+  const symbol = currency === 'INR' ? '₹' : '$';
+  const locale = currency === 'INR' ? 'en-IN' : 'en-US';
+  return `${sign}${symbol}${abs.toLocaleString(locale, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   })}`;
@@ -173,18 +236,18 @@ export function getSeriesForTimeframe(
   const lastPoint = baseSeries[baseSeries.length - 1];
   if (timeframe === '1D') {
     const times = ['09:30', '10:15', '11:00', '11:45', '12:30', '13:15', '14:00', '14:45', '15:30', '16:00'];
-    const startPrice = lastPoint.open || lastPoint.price * 0.988;
+    const startPrice = lastPoint.open || lastPoint.price * 0.992;
     const diff = lastPoint.price - startPrice;
     return times.map((t, i) => {
       const progress = i / (times.length - 1);
-      const wave = Math.sin(i * 1.3) * (lastPoint.price * 0.0035);
+      const wave = Math.sin(i * 1.3) * (lastPoint.price * 0.0025);
       const p = Number((startPrice + diff * progress + (i === times.length - 1 ? 0 : wave)).toFixed(2));
       return {
         date: t,
         price: p,
         open: Number((p * 0.998).toFixed(2)),
-        high: Number((p * 1.004).toFixed(2)),
-        low: Number((p * 0.995).toFixed(2)),
+        high: Number((p * 1.003).toFixed(2)),
+        low: Number((p * 0.996).toFixed(2)),
         volume: Math.round((lastPoint.volume / 10) * (0.8 + (i % 3) * 0.25)),
       };
     });
@@ -202,7 +265,7 @@ export function getSeriesForTimeframe(
   const firstPoint = baseSeries[0];
   const earlierMonths = ['Nov 15', 'Dec 01', 'Dec 15', 'Jan 01', 'Jan 15', 'Feb 01'];
   const prefix: PricePoint[] = earlierMonths.map((d, i) => {
-    const factor = 0.82 + i * 0.028;
+    const factor = 0.86 + i * 0.022;
     const p = Number((firstPoint.price * factor).toFixed(2));
     return {
       date: d,
