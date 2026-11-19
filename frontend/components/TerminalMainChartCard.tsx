@@ -878,3 +878,296 @@ export const TerminalMainChartCard: React.FC<TerminalMainChartCardProps> = ({
           {isComparing && (
             <>
               {comparisonData.minPct <= 0 && comparisonData.maxPct >= 0 && (
+                <line
+                  x1={padLeft}
+                  y1={getPctY(0)}
+                  x2={svgWidth - padRight}
+                  y2={getPctY(0)}
+                  stroke="#9CA3AF"
+                  strokeWidth={1}
+                  strokeDasharray="4 4"
+                />
+              )}
+              {comparisonData.tickers.map((series) => {
+                const pathD = series.points
+                  .map(
+                    (pt, idx) =>
+                      `${idx === 0 ? 'M' : 'L'} ${getX(idx).toFixed(1)} ${getPctY(
+                        pt.pctReturn
+                      ).toFixed(1)}`
+                  )
+                  .join(' ');
+                const lastPt = series.points[series.points.length - 1];
+                const lastX = getX(series.points.length - 1);
+                const lastY = lastPt ? getPctY(lastPt.pctReturn) : padTop;
+                return (
+                  <g key={`cmp-${series.ticker}`} data-testid={`compare-series-${series.ticker}`}>
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke={series.color}
+                      strokeWidth={series.isPrimary ? 2.6 : 2.1}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {series.points.map((pt, ptIdx) => (
+                      <circle
+                        key={`cmp-dot-${series.ticker}-${ptIdx}`}
+                        cx={getX(ptIdx)}
+                        cy={getPctY(pt.pctReturn)}
+                        r={hoveredPointIdx === ptIdx ? 4.8 : 2.8}
+                        fill={hoveredPointIdx === ptIdx ? '#131722' : series.color}
+                        stroke="#FFFFFF"
+                        strokeWidth={1.2}
+                      />
+                    ))}
+                    {!showRSI && lastPt && (
+                      <text
+                        x={lastX + 6}
+                        y={lastY + 3}
+                        className="text-[10px] font-mono font-bold"
+                        fill={series.color}
+                      >
+                        {series.ticker}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </>
+          )}
+
+          {/* Optional Relative Strength Index (RSI) Synchronized Overlay Band */}
+          {showRSI && (
+            <g data-testid="rsi-overlay-pane">
+              {/* Separator line between Price/Comparison and RSI pane */}
+              <line
+                x1={padLeft}
+                y1={rsiTop - 10}
+                x2={svgWidth - padRight}
+                y2={rsiTop - 10}
+                stroke="#E5E7EB"
+              />
+
+              {/* Overbought (70–100) and Oversold (0–30) subtle bands */}
+              <rect
+                x={padLeft}
+                y={getRsiY(100)}
+                width={plotW}
+                height={getRsiY(70) - getRsiY(100)}
+                fill="rgba(220, 38, 38, 0.045)"
+              />
+              <rect
+                x={padLeft}
+                y={getRsiY(30)}
+                width={plotW}
+                height={getRsiY(0) - getRsiY(30)}
+                fill="rgba(8, 153, 129, 0.045)"
+              />
+
+              {/* RSI Threshold Reference Lines: 70, 50, 30 */}
+              {[
+                { level: 70, color: '#EF4444', dash: '3 3' },
+                { level: 50, color: '#D1D5DB', dash: '2 4' },
+                { level: 30, color: '#089981', dash: '3 3' },
+              ].map((ref) => {
+                const ry = getRsiY(ref.level);
+                return (
+                  <g key={`rsi-ref-${ref.level}`}>
+                    <line
+                      x1={padLeft}
+                      y1={ry}
+                      x2={svgWidth - padRight}
+                      y2={ry}
+                      stroke={ref.color}
+                      strokeWidth={1}
+                      strokeDasharray={ref.dash}
+                      opacity={0.7}
+                    />
+                    <text
+                      x={svgWidth - padRight + 6}
+                      y={ry + 3}
+                      textAnchor="start"
+                      className="text-[9px] font-mono tabular-nums"
+                      fill={ref.level === 50 ? '#6B7280' : ref.color}
+                    >
+                      {ref.level}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Left-side 100 / 0 bounds + RSI header label */}
+              <text
+                x={padLeft - 8}
+                y={getRsiY(70) + 3}
+                textAnchor="end"
+                className="fill-[#6B7280] text-[9px] font-mono tabular-nums"
+              >
+                70
+              </text>
+              <text
+                x={padLeft - 8}
+                y={getRsiY(30) + 3}
+                textAnchor="end"
+                className="fill-[#6B7280] text-[9px] font-mono tabular-nums"
+              >
+                30
+              </text>
+              <text
+                x={padLeft + 4}
+                y={rsiTop + 10}
+                className="text-[10px] font-mono font-semibold"
+                fill="#4B5563"
+              >
+                RSI ({comparisonData.effectiveRsiPeriod}) ·{' '}
+                <tspan fill={rsiSummary.color}>
+                  {activeRsiValue !== null ? `${activeRsiValue.toFixed(1)} ${rsiSummary.label}` : 'Warm-up'}
+                </tspan>
+              </text>
+
+              {/* Plot RSI Curve(s) */}
+              {comparisonData.tickers.map((series, sIdx) => {
+                const rsiPts: string[] = [];
+                series.rsiSeries.forEach((val, idx) => {
+                  if (val !== null) {
+                    rsiPts.push(
+                      `${rsiPts.length === 0 ? 'M' : 'L'} ${getX(idx).toFixed(1)} ${getRsiY(val).toFixed(1)}`
+                    );
+                  }
+                });
+                const rsiStroke = isComparing ? series.color : '#7C3AED';
+                const pathD = rsiPts.join(' ');
+                if (!pathD) return null;
+                return (
+                  <g key={`rsi-line-${series.ticker}`}>
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke={rsiStroke}
+                      strokeWidth={sIdx === 0 ? 2 : 1.5}
+                      strokeDasharray={sIdx === 0 ? undefined : '4 2'}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {series.rsiSeries.map((val, idx) => {
+                      if (val === null) return null;
+                      const isPointHovered = hoveredPointIdx === idx;
+                      if (!isPointHovered && sIdx > 0) return null;
+                      return (
+                        <circle
+                          key={`rsi-dot-${series.ticker}-${idx}`}
+                          cx={getX(idx)}
+                          cy={getRsiY(val)}
+                          r={isPointHovered ? 4 : 2.3}
+                          fill={isPointHovered ? '#131722' : rsiStroke}
+                          stroke="#FFFFFF"
+                          strokeWidth={1}
+                        />
+                      );
+                    })}
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
+          {/* Shared Hover Crosshair, Primary Single-Mode Markers, X-Axis Labels & Hit Targets */}
+          {comparisonData.dates.map((dateLabel, i) => {
+            const cx = getX(i);
+            const pt = chartSeries[i];
+            const cy = pt ? getPriceY(pt.price) : padTop;
+            const isHovered = hoveredPointIdx === i;
+            const crosshairBottom = showRSI ? rsiTop + rsiPlotH : padTop + pricePlotH;
+            return (
+              <g
+                key={`pt-${i}`}
+                onMouseEnter={() => setHoveredPointIdx(i)}
+                onMouseLeave={() => setHoveredPointIdx(null)}
+                className="cursor-pointer"
+              >
+                {isHovered && (
+                  <line
+                    x1={cx}
+                    y1={padTop}
+                    x2={cx}
+                    y2={crosshairBottom}
+                    stroke="rgba(41, 98, 255, 0.45)"
+                    strokeWidth={1}
+                  />
+                )}
+                {!isComparing && pt && (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isHovered ? 5.5 : 3.5}
+                    fill={isHovered ? '#131722' : '#2962FF'}
+                    stroke="#FFFFFF"
+                    strokeWidth={1.5}
+                  />
+                )}
+                {(i % 2 === 0 || i === comparisonData.dates.length - 1) && (
+                  <text
+                    x={cx}
+                    y={svgHeight - 10}
+                    textAnchor="middle"
+                    className="fill-[#6B7280] text-[10px] font-mono"
+                  >
+                    {dateLabel}
+                  </text>
+                )}
+                <rect
+                  x={cx - 16}
+                  y={padTop}
+                  width={32}
+                  height={crosshairBottom - padTop}
+                  fill="transparent"
+                />
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* Key Quantitative Telemetry Strip below chart */}
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-4 pt-4 mt-4 border-t border-[#F3F4F6]">
+        <div>
+          <div className="text-[11px] text-[#6B7280]">Scheme AUM</div>
+          <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
+            {activeStock.aum || activeStock.marketCap}
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] text-[#6B7280]">Expense Ratio</div>
+          <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
+            {activeStock.expenseRatio || `${activeStock.peRatio}% TER`}
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] text-[#6B7280]">14D RSI</div>
+          <div className="text-sm font-mono font-semibold text-[#2962FF] tabular-nums mt-0.5">
+            {activeStock.rsi14}
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] text-[#6B7280]">YTM / 3Y CAGR</div>
+          <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
+            {activeStock.ytmOrCagr || `${activeStock.ivRank}%`}
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] text-[#6B7280]">Duration / Tracking</div>
+          <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
+            {activeStock.modifiedDuration || activeStock.institutionalOwnership}
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] text-[#6B7280]">Next Disclosure</div>
+          <div className="text-sm font-mono font-semibold text-[#131722] tabular-nums mt-0.5">
+            {activeStock.nextEarnings}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
