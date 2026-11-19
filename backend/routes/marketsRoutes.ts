@@ -45,6 +45,56 @@ export function createMarketsRouter(): Router {
     });
   });
 
+  router.get('/heatmap', (req, res) => {
+    const rawMarket = String(req.query.market || 'global').trim().toLowerCase();
+    const market: HeatmapMarket = rawMarket === 'india' ? 'india' : 'global';
+    const sector = String(req.query.sector || 'All').trim() || 'All';
+    const tick = Math.max(0, Math.min(200, Math.floor(Number(req.query.tick || 0) || 0)));
+
+    let tiles = HEATMAP_STOCKS;
+    for (let step = 1; step <= tick; step++) {
+      tiles = applyHeatmapTick(tiles, step);
+    }
+
+    const groups = buildSectorGroups(tiles, market, sector);
+    const activeTiles = groups.flatMap((g) => g.tiles).map((tile) => ({
+      ...tile,
+      volatilityPct: calculateRealizedVolatility(tile.sparkline, tile.changePercent),
+    }));
+
+    const totalCapB = groups.reduce((sum, g) => sum + g.totalCapB, 0);
+    const weightedVolatilityPct =
+      totalCapB > 0
+        ? Number(
+            (
+              groups.reduce((sum, g) => sum + g.volatilityPct * g.totalCapB, 0) / totalCapB
+            ).toFixed(1)
+          )
+        : 0;
+    const weightedChangePct =
+      totalCapB > 0
+        ? Number(
+            (
+              groups.reduce((sum, g) => sum + g.avgChangePercent * g.totalCapB, 0) / totalCapB
+            ).toFixed(2)
+          )
+        : 0;
+
+    res.json({
+      market,
+      sector,
+      tick,
+      totalCapB,
+      weightedVolatilityPct,
+      weightedChangePct,
+      advancers: activeTiles.filter((t) => t.changePercent > 0).length,
+      decliners: activeTiles.filter((t) => t.changePercent < 0).length,
+      sectors: groups,
+      tiles: activeTiles,
+      updatedAt: new Date().toISOString(),
+    });
+  });
+
   router.get('/sentiment', async (req, res) => {
     const forceRefresh = req.query.refresh === '1';
     const now = Date.now();
@@ -53,51 +103,29 @@ export function createMarketsRouter(): Router {
       return;
     }
 
-    let liveCryptoFng = null;
-    let liveBtcChangePercent: number | null = null;
-    let liveWireNews: WireNewsItem[] = [];
+    let liveSpotGoldChangePercent: number | null = null;
 
-    const [fngResult, btcResult, ccNewsResult] = await Promise.allSettled([
-      fetchWithTimeout('https://api.alternative.me/fng/?limit=90', {}, 4500),
-      fetchWithTimeout('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT', {}, 4000),
-      fetchWithTimeout('https://min-api.cryptocompare.com/data/v2/news/?lang=EN', {}, 3500),
-    ]);
-
-    if (fngResult.status === 'fulfilled' && fngResult.value.ok) {
-      try {
-        const fngJson = await fngResult.value.json();
-        liveCryptoFng = parseAlternativeMeFng(fngJson);
-      } catch {
-        // Fallback silently
-      }
-    }
-
-    if (btcResult.status === 'fulfilled' && btcResult.value.ok) {
-      try {
-        const btcJson = (await btcResult.value.json()) as { priceChangePercent?: string };
-        const pct = Number(btcJson.priceChangePercent);
+    try {
+      const goldRes = await fetchWithTimeout(
+        'https://api.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT',
+        {},
+        4000
+      );
+      if (goldRes.ok) {
+        const goldJson = (await goldRes.json()) as { priceChangePercent?: string };
+        const pct = Number(goldJson.priceChangePercent);
         if (Number.isFinite(pct)) {
-          liveBtcChangePercent = Number(pct.toFixed(2));
+          liveSpotGoldChangePercent = Number(pct.toFixed(2));
         }
-      } catch {
-        // Fallback silently
       }
-    }
-
-    if (ccNewsResult.status === 'fulfilled' && ccNewsResult.value.ok) {
-      try {
-        const ccJson = await ccNewsResult.value.json();
-        liveWireNews = parseLiveCryptoCompareNews(ccJson);
-      } catch {
-        // Fallback silently
-      }
+    } catch {
+      // Fallback silently to deterministic 4-pillar gold composite
     }
 
     const aggregatedNews: WireNewsItem[] = [
-      ...liveWireNews,
       ...TOP_STORIES,
-      ...INDIAN_STOCKS_NEWS,
-      ...CRYPTO_NEWS,
+      ...MUTUAL_FUND_NEWS,
+      ...GOLD_DEBT_NEWS,
       ...FOREX_NEWS,
       ...FUTURES_NEWS,
     ];
