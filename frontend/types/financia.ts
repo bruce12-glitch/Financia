@@ -6,7 +6,15 @@ export interface CaseItem {
 export interface DeepInsight {
   title: string;
   description: string;
-  category: 'Fundamental' | 'Technical' | 'Options & Flow' | 'Insider & SEC' | 'Macro';
+  category:
+    | 'Fund Flow'
+    | 'Technical'
+    | 'Yield & Duration'
+    | 'Factsheet & AMFI'
+    | 'Macro'
+    | 'Fundamental'
+    | 'Options & Flow'
+    | 'Insider & SEC';
   impact_score: number;
 }
 
@@ -54,7 +62,7 @@ export interface ReportData {
   deep_insights: DeepInsight[];
   findings: DocumentFinding[];
   podcast_script: {
-    speaker: 'Lead Quant (Kore)' | 'SEC Strategist (Aoede)';
+    speaker: 'Fund Quant (Kore)' | 'Fixed-Income Desk (Aoede)' | 'Lead Quant (Kore)' | 'SEC Strategist (Aoede)';
     line: string;
   }[];
 }
@@ -69,10 +77,13 @@ export interface TimelineEvent {
   endTime?: number;
 }
 
+export type PillarSector = 'Mutual Funds' | 'Gold & Bullion' | 'Debt Funds' | 'ETFs';
+
 export interface StockQuote {
   ticker: string;
   name: string;
-  sector: 'Semiconductors & AI' | 'Global Indices & ETFs' | 'Mega-Cap Tech' | 'Financials & Macro';
+  sector: PillarSector;
+  assetClass?: 'Mutual Fund' | 'Gold Bullion' | 'Debt Fund' | 'ETF';
   price: number;
   change: number;
   changePercent: number;
