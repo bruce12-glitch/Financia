@@ -7,19 +7,19 @@ export interface HeroTickerItem {
 }
 
 export const INITIAL_HERO_TICKER_ITEMS: HeroTickerItem[] = [
-  { symbol: 'NIFTY 50', lookupSymbol: 'NIFTY', price: 25291.1, decimals: 2, changePercent: 0.58 },
-  { symbol: 'SENSEX', lookupSymbol: 'SENSEX', price: 82104.79, decimals: 2, changePercent: 0.63 },
-  { symbol: 'RELIANCE', lookupSymbol: 'RELIANCE', price: 2948.6, decimals: 2, changePercent: 1.24 },
-  { symbol: 'TCS', lookupSymbol: 'TCS', price: 4163.0, decimals: 2, changePercent: 0.47 },
-  { symbol: 'INFY', lookupSymbol: 'INFY', price: 1872.25, decimals: 2, changePercent: -0.66 },
-  { symbol: 'USD/INR', lookupSymbol: 'USDINR', price: 83.47, decimals: 2, changePercent: 0.04 },
-  { symbol: 'GOLD 10g', lookupSymbol: 'GC1!', price: 72140, decimals: 0, changePercent: 0.31 },
-  { symbol: 'S&P 500', lookupSymbol: 'SPX', price: 7561.67, decimals: 2, changePercent: -0.4 },
-  { symbol: 'NASDAQ 100', lookupSymbol: 'NDX', price: 27943.74, decimals: 2, changePercent: -1.22 },
-  { symbol: 'NVDA', lookupSymbol: 'NVDA', price: 138.6, decimals: 2, changePercent: 3.6 },
-  { symbol: 'AAPL', lookupSymbol: 'AAPL', price: 228.45, decimals: 2, changePercent: 1.4 },
-  { symbol: 'BTC/USD', lookupSymbol: 'BTCUSD', price: 88961, decimals: 0, changePercent: -3.1 },
-  { symbol: 'EUR/USD', lookupSymbol: 'EURUSD', price: 1.1588, decimals: 4, changePercent: -0.11 },
+  { symbol: 'GOLDBEES', lookupSymbol: 'GOLDBEES', price: 74.85, decimals: 2, changePercent: 1.24 },
+  { symbol: 'SPOT GOLD', lookupSymbol: 'PAXGUSDT', price: 3284.5, decimals: 2, changePercent: 1.18 },
+  { symbol: 'PPFAS NAV', lookupSymbol: 'PPFAS', price: 89.42, decimals: 2, changePercent: 0.88 },
+  { symbol: 'NIFTYBEES', lookupSymbol: 'NIFTYBEES', price: 284.6, decimals: 2, changePercent: 1.01 },
+  { symbol: 'SBIGILT NAV', lookupSymbol: 'SBIGILT', price: 68.14, decimals: 2, changePercent: 0.35 },
+  { symbol: 'HDFCCORP NAV', lookupSymbol: 'HDFCCORP', price: 33.48, decimals: 2, changePercent: 0.24 },
+  { symbol: 'LIQUIDBEES', lookupSymbol: 'LIQUIDBEES', price: 1000.0, decimals: 2, changePercent: 0.02 },
+  { symbol: 'SILVERBEES', lookupSymbol: 'SILVERBEES', price: 96.2, decimals: 2, changePercent: 0.94 },
+  { symbol: 'GLD ETF', lookupSymbol: 'GLD', price: 306.4, decimals: 2, changePercent: 1.27 },
+  { symbol: 'AGG BOND', lookupSymbol: 'AGG', price: 98.75, decimals: 2, changePercent: 0.28 },
+  { symbol: 'TLT 20Y TSY', lookupSymbol: 'TLT', price: 91.4, decimals: 2, changePercent: 0.64 },
+  { symbol: 'USD/INR', lookupSymbol: 'USDINR', price: 85.42, decimals: 2, changePercent: -0.18 },
+  { symbol: 'IN 10Y G-SEC', lookupSymbol: 'IN10Y', price: 6.842, decimals: 3, changePercent: -0.62 },
 ];
 
 export function formatTickerPrice(price: number, decimals: number): string {
