@@ -40,7 +40,7 @@ import { CommunityIdeaItem, MarketSymbolRow, WireNewsItem } from './types/market
 
 export default function App() {
   const [stocks, setStocks] = useState<StockQuote[]>(INITIAL_STOCKS);
-  const [selectedTicker, setSelectedTicker] = useState<string>('NVDA');
+  const [selectedTicker, setSelectedTicker] = useState<string>('GOLDBEES');
   const [liveFeedActive, setLiveFeedActive] = useState<boolean>(true);
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -85,8 +85,43 @@ export default function App() {
   const [selectedIdea, setSelectedIdea] = useState<CommunityIdeaItem | null>(null);
 
   const [alerts, setAlerts] = useState<PriceAlert[]>(() => loadSavedAlerts());
+  const [comparisonTickers, setComparisonTickers] = useState<string[]>([]);
   const [alertTarget, setAlertTarget] = useState<AlertTargetAsset | null>(null);
   const [triggeredBanner, setTriggeredBanner] = useState<PriceAlert | null>(null);
+
+  const syncWorkspaceFromServer = useCallback(async (token: string) => {
+    try {
+      const [alertsRes, watchlistRes] = await Promise.all([
+        fetch('/api/alerts', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/watchlist', { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      if (alertsRes.ok) {
+        const payload = (await alertsRes.json()) as { alerts?: PriceAlert[] };
+        if (Array.isArray(payload.alerts)) {
+          setAlerts(payload.alerts);
+          persistAlerts(payload.alerts);
+        }
+      }
+
+      if (watchlistRes.ok) {
+        const wlPayload = (await watchlistRes.json()) as {
+          watchlist?: {
+            primaryTicker?: string;
+            comparisonTickers?: string[];
+          };
+        };
+        if (wlPayload.watchlist?.primaryTicker) {
+          setSelectedTicker(wlPayload.watchlist.primaryTicker);
+        }
+        if (Array.isArray(wlPayload.watchlist?.comparisonTickers)) {
+          setComparisonTickers(wlPayload.watchlist.comparisonTickers);
+        }
+      }
+    } catch {
+      // Keep local workspace state gracefully if offline
+    }
+  }, []);
 
   // Sync URL with authenticated workspace view & handle browser Back/Forward
   useEffect(() => {
@@ -117,7 +152,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [authSession]);
 
-  // Verify stored session against backend on mount when token exists
+  // Verify stored session against backend on mount & load persisted workspace state
   useEffect(() => {
     const stored = loadStoredAuthSession();
     if (!stored?.token) return;
@@ -130,6 +165,7 @@ export default function App() {
           const next = { user: data.user, token: stored.token };
           setAuthSession(next);
           persistAuthSession(next);
+          void syncWorkspaceFromServer(stored.token);
         } else {
           clearAuthSession();
           setAuthSession(null);
@@ -142,7 +178,7 @@ export default function App() {
       .catch(() => {
         // Keep local stored session seamlessly
       });
-  }, []);
+  }, [syncWorkspaceFromServer]);
 
   // Persist user price alerts across sessions
   useEffect(() => {
@@ -179,11 +215,12 @@ export default function App() {
       setAuthSession(session);
       persistAuthSession(session);
       setSignupOpen(false);
+      void syncWorkspaceFromServer(session.token);
       const target = pendingSectionRef.current;
       pendingSectionRef.current = null;
       enterFrontend(target);
     },
-    [enterFrontend]
+    [enterFrontend, syncWorkspaceFromServer]
   );
 
   const handleSignOut = useCallback(async () => {
@@ -324,7 +361,7 @@ export default function App() {
     }
   }, [stocks, alerts]);
 
-  // Enrich active ticker with live SEC EDGAR / Alpha Vantage / Finnhub backend data
+  // Enrich active asset with live AMFI MFAPI / Marketstack / Binance backend data
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/stocks/analyze?ticker=${encodeURIComponent(selectedTicker)}`)
