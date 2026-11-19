@@ -692,36 +692,35 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
                     key={debt.symbol}
                     item={debt}
                     pillStyle
-                    onClick={() => onSelectSymbol(coin)}
+                    onClick={() => onSelectSymbol(debt)}
                   />
                 ))}
               </div>
             </div>
           </div>
 
-          <NewsWireGrid title="Crypto news" items={CRYPTO_NEWS} onSelectNews={onSelectNews} />
+          <NewsWireGrid title="Gold & bullion news" items={GOLD_DEBT_NEWS} onSelectNews={onSelectNews} />
         </section>
 
         {/* ============================================================ */}
-        {/* 3. FUTURES & COMMODITIES (PDF p.13-14 + Screenshots)         */}
+        {/* 3. DEBT FUNDS & FIXED INCOME                                 */}
         {/* ============================================================ */}
-        <section id="futures-section" aria-label="Futures and commodities" className="space-y-10">
+        <section id="debt-funds-section" aria-label="Debt Funds and Fixed Income" className="space-y-10">
           <h2 className="text-[28px] font-display font-bold text-[#131722] inline-flex items-center gap-1">
-            <span>Futures and commodities</span>
+            <span>Debt Funds &amp; Fixed Income</span>
             <ChevronRight className="w-6 h-6" />
           </h2>
 
-          <TradeIdeasPair ideas={FUTURES_TRADE_IDEAS} onSelectIdea={onSelectIdea} />
+          <TradeIdeasPair ideas={GOLD_TRADE_IDEAS} onSelectIdea={onSelectIdea} />
 
-          {/* Exact Match to image_427b5b41.png: Side-by-Side Energy futures & Metals futures */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
             <div>
               <h3 className="text-2xl font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-                <span>Energy futures</span>
+                <span>Gilt &amp; Sovereign Debt Funds</span>
                 <ChevronRight className="w-5 h-5" />
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 divide-y sm:divide-y-0 border-t border-b border-[#F0F3FA] py-2">
-                {ENERGY_FUTURES.map((row) => (
+                {DEBT_FUND_LEADERS.map((row) => (
                   <SymbolBadgeRow key={row.symbol} item={row} onClick={() => onSelectSymbol(row)} />
                 ))}
               </div>
@@ -729,21 +728,20 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
 
             <div>
               <h3 className="text-2xl font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-                <span>Metals futures</span>
+                <span>Global Index &amp; Bond ETFs</span>
                 <ChevronRight className="w-5 h-5" />
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 divide-y sm:divide-y-0 border-t border-b border-[#F0F3FA] py-2">
-                {METALS_FUTURES.map((row) => (
+                {GLOBAL_ETFS_LIST.map((row) => (
                   <SymbolBadgeRow key={row.symbol} item={row} onClick={() => onSelectSymbol(row)} />
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Exact Match to image_396c4c53.png */}
           <NewsWireGrid
-            title="Futures news"
-            items={FUTURES_NEWS}
+            title="Fixed-income & yield news"
+            items={GOLD_DEBT_NEWS}
             onSelectNews={onSelectNews}
           />
         </section>
@@ -924,29 +922,29 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
             </div>
           </div>
 
-          {/* Institutional Equity Analysis & Live Feed Connections */}
+          {/* Institutional 4-Pillar Research & Live Feed Connections */}
           <div>
             <h3 className="text-xl font-display font-bold text-[#131722] mb-2 inline-flex items-center gap-1">
               <span>Institutional data &amp; live API research</span>
               <ChevronRight className="w-5 h-5" />
             </h3>
             <p className="text-sm text-[#434651] mb-4">
-              Financia focuses strictly on equity research, SEC filing synthesis, and live multi-asset telemetry — not order execution.
+              Financia focuses strictly on Mutual Funds, Gold Bullion, Debt Funds, and ETFs — not order execution.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
                 type="button"
-                onClick={() => onJumpToAnalysis?.('NVDA')}
+                onClick={() => onJumpToAnalysis?.('GOLDBEES')}
                 className="rounded-2xl border border-[#E0E3EB] bg-[#F8F9FD] hover:border-[#2962FF]/50 p-5 text-left transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-2 text-base font-bold text-[#131722] mb-1">
                   <LineChart className="w-4 h-4 text-[#2962FF]" />
-                  <span>Financia Live Equity Analysis Terminal</span>
+                  <span>Financia Live Fund, Gold, Debt &amp; ETF Terminal</span>
                 </div>
                 <div className="text-xs text-[#787B86] mb-3">
-                  Multi-agent 10-Q/10-K SEC synthesis, options surface telemetry &amp; Bull/Bear stress testing
+                  Live AMFI NAV synthesis, Marketstack ETF EOD pricing, LBMA bullion custody &amp; Gilt YTM duration analysis
                 </div>
-                <div className="text-xs font-semibold text-[#2962FF]">Launch Stock Analysis ›</div>
+                <div className="text-xs font-semibold text-[#2962FF]">Launch Fund Terminal ›</div>
               </button>
 
               <div className="rounded-2xl border border-[#E0E3EB] bg-[#F8F9FD] p-5">
@@ -955,7 +953,7 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
                   <span>Backend Market API Ready</span>
                 </div>
                 <div className="text-xs text-[#787B86] mb-3">
-                  Pre-wired Express server routes (/api/stocks/analyze, /api/markets/overview) ready for custom quote &amp; FX feeds
+                  Pre-wired Express server routes (/api/funds/analyze, /api/mf/search, /api/markets/overview) connected to live feeds
                 </div>
                 <div className="text-xs font-semibold text-[#089981]">Server Proxy Active • Port 3000</div>
               </div>
