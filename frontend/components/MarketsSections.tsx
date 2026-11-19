@@ -489,78 +489,40 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
             </div>
           </div>
 
-          {/* Indian Stocks Trade Ideas (PDF Pages 6–7) */}
-          <TradeIdeasPair ideas={INDIAN_TRADE_IDEAS} onSelectIdea={onSelectIdea} />
+          <TradeIdeasPair ideas={MUTUAL_FUND_AND_ETF_IDEAS} onSelectIdea={onSelectIdea} />
 
-          {/* Highest Volume Stocks (2-column grid matching PDF p.7) */}
+          {/* Top Broad & Index ETFs */}
           <div>
             <h3 className="text-xl font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-              <span>Highest volume stocks</span>
+              <span>Top Broad &amp; Index ETFs</span>
               <ChevronRight className="w-5 h-5" />
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 divide-y md:divide-y-0 border-t border-b border-[#F0F3FA] py-2">
-              {HIGHEST_VOLUME_STOCKS.map((stock) => (
-                <SymbolBadgeRow key={stock.symbol} item={stock} onClick={() => onSelectSymbol(stock)} />
+              {GLOBAL_ETFS_LIST.map((etf) => (
+                <SymbolBadgeRow key={etf.symbol} item={etf} onClick={() => onSelectSymbol(etf)} />
               ))}
             </div>
           </div>
 
-          {/* Most Volatile Stocks (PDF Pages 7–8) */}
+          {/* Direct Mutual Fund Leaders */}
           <div>
             <h3 className="text-xl font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-              <span>Most volatile stocks</span>
+              <span>Direct Mutual Fund Leaders</span>
               <ChevronRight className="w-5 h-5" />
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 divide-y md:divide-y-0 border-t border-b border-[#F0F3FA] py-2">
-              {MOST_VOLATILE_STOCKS.map((stock) => (
-                <SymbolBadgeRow key={stock.symbol} item={stock} onClick={() => onSelectSymbol(stock)} />
+              {MUTUAL_FUND_LEADERS.map((fund) => (
+                <SymbolBadgeRow key={fund.symbol} item={fund} pillStyle onClick={() => onSelectSymbol(fund)} />
               ))}
             </div>
           </div>
 
-          {/* Stock Gainers & Stock Losers (PDF p.8–9) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-            <div>
-              <h3 className="text-xl font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-                <span>Stock gainers</span>
-                <ChevronRight className="w-5 h-5" />
-              </h3>
-              <div className="divide-y divide-[#F0F3FA]">
-                {STOCK_GAINERS.map((stock) => (
-                  <SymbolBadgeRow
-                    key={stock.symbol}
-                    item={stock}
-                    pillStyle
-                    onClick={() => onSelectSymbol(stock)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-xl font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-                <span>Stock losers</span>
-                <ChevronRight className="w-5 h-5" />
-              </h3>
-              <div className="divide-y divide-[#F0F3FA]">
-                {STOCK_LOSERS.map((stock) => (
-                  <SymbolBadgeRow
-                    key={stock.symbol}
-                    item={stock}
-                    pillStyle
-                    onClick={() => onSelectSymbol(stock)}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Earnings Calendar & IPO Calendar (PDF p.9–10) */}
+          {/* Policy & Yield Schedule + NFO & SGB Tranches Calendar */}
           <div className="space-y-8">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <h3 className="text-xl font-display font-bold text-[#131722] inline-flex items-center gap-1">
-                  <span>Earnings Calendar</span>
+                  <span>Policy &amp; Yield Schedule</span>
                   <ChevronRight className="w-5 h-5" />
                 </h3>
                 <button
@@ -571,7 +533,7 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
                   }}
                   className="text-xs font-semibold text-[#2962FF] hover:underline inline-flex items-center gap-0.5 cursor-pointer"
                 >
-                  <span>Live countdowns &amp; major tickers</span>
+                  <span>Live countdowns &amp; policy catalysts</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -579,13 +541,13 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-[#E0E3EB] text-[11px] font-semibold text-[#787B86] uppercase">
-                      <th className="py-2 pr-4">Symbol</th>
-                      <th className="py-2 px-4 text-right">Actual</th>
-                      <th className="py-2 pl-4 text-right">Estimate</th>
+                      <th className="py-2 pr-4">Catalyst &amp; Instrument</th>
+                      <th className="py-2 px-4 text-right">Actual / Coupon</th>
+                      <th className="py-2 pl-4 text-right">Consensus / Target</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F0F3FA] text-sm tabular-nums">
-                    {EARNINGS_CALENDAR.map((row) => (
+                    {POLICY_AND_AUCTION_CALENDAR.map((row) => (
                       <tr key={row.id} className="hover:bg-[#F8F9FD]">
                         <td className="py-3 pr-4">
                           <div className="flex items-center gap-3">
@@ -611,36 +573,36 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
 
             <div>
               <h3 className="text-xl font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-                <span>IPO Calendar</span>
+                <span>NFO &amp; SGB Tranches Calendar</span>
                 <ChevronRight className="w-5 h-5" />
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-[#E0E3EB] text-[11px] font-semibold text-[#787B86] uppercase">
-                      <th className="py-2 pr-4">Symbol</th>
-                      <th className="py-2 px-4 text-right">Exchange</th>
-                      <th className="py-2 pl-4 text-right">Offer Price</th>
+                      <th className="py-2 pr-4">Scheme / Tranche</th>
+                      <th className="py-2 px-4 text-right">Issuer</th>
+                      <th className="py-2 pl-4 text-right">Coupon / Offer NAV</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F0F3FA] text-sm tabular-nums">
-                    {INDIAN_IPO_CALENDAR.map((ipo) => (
-                      <tr key={ipo.symbol} className="hover:bg-[#F8F9FD]">
+                    {NFO_AND_SGB_TRANCHES.map((tranche) => (
+                      <tr key={tranche.symbol} className="hover:bg-[#F8F9FD]">
                         <td className="py-3 pr-4">
                           <div className="flex items-center gap-3">
                             <span className="text-xs font-semibold text-[#434651] w-12 shrink-0">
-                              {ipo.date}
+                              {tranche.date}
                             </span>
                             <div>
-                              <div className="font-semibold text-[#131722]">{ipo.name}</div>
+                              <div className="font-semibold text-[#131722]">{tranche.name}</div>
                               <span className="text-[11px] font-mono bg-[#F0F3FA] text-[#787B86] px-1.5 py-0.5 rounded">
-                                {ipo.symbol}
+                                {tranche.symbol}
                               </span>
                             </div>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-right font-medium text-[#131722]">{ipo.exchange}</td>
-                        <td className="py-3 pl-4 text-right font-semibold text-[#131722]">{ipo.offerPrice}</td>
+                        <td className="py-3 px-4 text-right font-medium text-[#131722]">{tranche.exchange}</td>
+                        <td className="py-3 pl-4 text-right font-semibold text-[#131722]">{tranche.offerPrice}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -649,7 +611,6 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
             </div>
           </div>
 
-          {/* Indian Stocks News Grid (Exact match to image_0b82860b.png) */}
           <NewsWireGrid
             title="Indian stocks news"
             items={INDIAN_STOCKS_NEWS}
