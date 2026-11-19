@@ -1,27 +1,20 @@
 import React, { useState } from 'react';
-import { ChevronRight, Globe, LineChart, Lock, MessageSquare, Rocket, Zap } from 'lucide-react';
+import { ChevronRight, Globe, LineChart, Lock, MessageSquare, Rocket, Search, Zap } from 'lucide-react';
 import {
-  CRYPTO_ASSETS,
-  CRYPTO_GAINERS,
-  CRYPTO_LOSERS,
-  CRYPTO_NEWS,
-  EARNINGS_CALENDAR,
+  DEBT_FUND_LEADERS,
   ECONOMIC_CALENDAR,
-  ENERGY_FUTURES,
   FOREX_NEWS,
   FOREX_PERFORMANCE_PAIRS,
   FOREX_TRADE_IDEAS,
-  FUTURES_NEWS,
-  FUTURES_TRADE_IDEAS,
-  HIGHEST_VOLUME_STOCKS,
-  INDIAN_COMMUNITY_TRENDS,
-  INDIAN_IPO_CALENDAR,
-  INDIAN_STOCKS_NEWS,
-  INDIAN_TRADE_IDEAS,
-  METALS_FUTURES,
-  MOST_VOLATILE_STOCKS,
-  STOCK_GAINERS,
-  STOCK_LOSERS,
+  GLOBAL_ETFS_LIST,
+  GOLD_BULLION_ASSETS,
+  GOLD_DEBT_NEWS,
+  GOLD_TRADE_IDEAS,
+  MUTUAL_FUND_AND_ETF_IDEAS,
+  MUTUAL_FUND_LEADERS,
+  MUTUAL_FUND_NEWS,
+  NFO_AND_SGB_TRANCHES,
+  POLICY_AND_AUCTION_CALENDAR,
 } from '../data/tradingViewData';
 import {
   computeDivergingBarMetrics,
@@ -290,6 +283,37 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
 }) => {
   const [forexTf, setForexTf] = useState<ForexTimeframe>('1D');
   const [activeSectionTab, setActiveSectionTab] = useState<'markets' | 'earnings'>('markets');
+  const [mfQuery, setMfQuery] = useState<string>('');
+  const [mfResults, setMfResults] = useState<Array<{ schemeCode: number; schemeName: string }>>([]);
+  const [mfSearching, setMfSearching] = useState<boolean>(false);
+  const [mfError, setMfError] = useState<string | null>(null);
+  const [mfSearchedOnce, setMfSearchedOnce] = useState<boolean>(false);
+
+  const handleAmfiSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = mfQuery.trim();
+    if (!trimmed) return;
+    setMfSearching(true);
+    setMfError(null);
+    setMfSearchedOnce(true);
+    try {
+      const res = await fetch(`/api/mf/search?q=${encodeURIComponent(trimmed)}`);
+      if (!res.ok) {
+        setMfError('Unable to reach live AMFI scheme registry right now.');
+        setMfResults([]);
+        return;
+      }
+      const data = (await res.json()) as {
+        results?: Array<{ schemeCode: number; schemeName: string }>;
+      };
+      setMfResults((data.results || []).slice(0, 8));
+    } catch {
+      setMfError('Network error querying /api/mf/search.');
+      setMfResults([]);
+    } finally {
+      setMfSearching(false);
+    }
+  };
 
   const divergingMetrics = React.useMemo(() => {
     return computeDivergingBarMetrics(FOREX_PERFORMANCE_PAIRS, forexTf);
@@ -332,14 +356,14 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
                   : 'text-[#434651] hover:text-[#131722]'
               }`}
             >
-              Earnings Calendar
+              Policy &amp; NFO Calendar
             </button>
           </div>
 
           <span className="text-xs text-[#787B86]">
             {activeSectionTab === 'earnings'
-              ? 'Upcoming global & NSE quarterly filings with live countdowns'
-              : 'Equities, crypto, futures, forex & macro inflation intelligence'}
+              ? 'Upcoming SGB tranches, G-Sec auctions, RBI & AMFI releases'
+              : 'Mutual funds, gold bullion, debt funds, ETFs & macro yield intelligence'}
           </span>
         </div>
 
@@ -348,48 +372,116 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
         ) : (
         <div className="space-y-16">
         {/* ============================================================ */}
-        {/* 1. INDIAN STOCKS (PDF Pages 6–10 & image_0b82860b.png)        */}
+        {/* 1. DIRECT MUTUAL FUNDS & ETFs                                */}
         {/* ============================================================ */}
-        <section id="indian-stocks-section" aria-label="Indian stocks" className="space-y-10">
+        <section id="mutual-funds-section" aria-label="Direct Mutual Funds and ETFs" className="space-y-10">
           <div>
             <h2 className="text-[28px] font-display font-bold text-[#131722] mb-5 inline-flex items-center gap-1">
-              <span>Indian stocks</span>
+              <span>Direct Mutual Funds &amp; ETFs</span>
               <ChevronRight className="w-6 h-6" />
             </h2>
 
+            {/* Live AMFI Scheme Lookup (wired to /api/mf/search) */}
+            <div className="mb-7 rounded-2xl border border-[#E0E3EB] bg-[#F8F9FD] p-4 md:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <div>
+                  <div className="text-sm font-bold text-[#131722]">Live AMFI Mutual Fund Scheme Lookup</div>
+                  <div className="text-xs text-[#787B86]">
+                    Search any Indian AMFI scheme by name or numeric code via api.mfapi.in and load it directly in the terminal
+                  </div>
+                </div>
+                <span className="text-[11px] font-mono text-[#2962FF] bg-white px-2.5 py-1 rounded border border-[#E0E3EB] self-start sm:self-auto">
+                  GET /api/mf/search
+                </span>
+              </div>
+
+              <form onSubmit={handleAmfiSearch} className="flex flex-col sm:flex-row gap-2">
+                <div className="flex items-center gap-2.5 flex-1 px-3 py-2 rounded-xl bg-white border border-[#D1D5DB] focus-within:border-[#2962FF]">
+                  <Search className="w-4 h-4 text-[#787B86] shrink-0" />
+                  <input
+                    type="text"
+                    value={mfQuery}
+                    onChange={(e) => setMfQuery(e.target.value)}
+                    placeholder="Search AMFI schemes (e.g. Parag Parikh, SBI Gilt, HDFC Mid-Cap, Nippon Gold)..."
+                    className="w-full text-xs text-[#131722] placeholder-[#9598A1] focus:outline-none bg-transparent"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={mfSearching}
+                  className="px-4 py-2 rounded-xl bg-[#131722] hover:bg-[#1F2937] disabled:opacity-60 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  {mfSearching ? 'Searching AMFI...' : 'Search AMFI Schemes'}
+                </button>
+              </form>
+
+              {mfError && (
+                <div className="mt-2.5 text-xs text-[#DC2626] font-mono">{mfError}</div>
+              )}
+
+              {mfResults.length > 0 && (
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {mfResults.map((item) => (
+                    <button
+                      key={item.schemeCode}
+                      type="button"
+                      onClick={() => onJumpToAnalysis?.(String(item.schemeCode))}
+                      className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-white border border-[#E0E3EB] hover:border-[#2962FF] text-left transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-[#131722] truncate">
+                          {item.schemeName}
+                        </div>
+                        <div className="text-[11px] font-mono text-[#787B86]">
+                          AMFI Code {item.schemeCode}
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-mono font-semibold text-[#2962FF] shrink-0">
+                        Analyze ›
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {mfSearchedOnce && !mfSearching && !mfError && mfResults.length === 0 && (
+                <div className="mt-2.5 text-xs text-[#787B86]">
+                  No AMFI schemes matched &ldquo;{mfQuery}&rdquo;. Try a broader fund house term such as &ldquo;Parag&rdquo; or &ldquo;Gilt&rdquo;.
+                </div>
+              )}
+            </div>
+
             <div className="text-base font-bold text-[#131722] mb-3">Community trends</div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {INDIAN_COMMUNITY_TRENDS.map((stock) => (
+              {MUTUAL_FUND_LEADERS.slice(0, 3).map((fund) => (
                 <button
-                  key={stock.symbol}
+                  key={fund.symbol}
                   type="button"
-                  onClick={() => onSelectSymbol(stock)}
+                  onClick={() => onSelectSymbol(fund)}
                   className="rounded-xl border border-[#E0E3EB] bg-white p-4 text-left hover:border-[#2962FF]/45 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 mb-3">
                     <span
                       className="w-8 h-8 rounded-full text-white text-xs font-bold flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: stock.badgeColor }}
+                      style={{ backgroundColor: fund.badgeColor }}
                     >
-                      {stock.badgeText}
+                      {fund.badgeText}
                     </span>
                     <div className="min-w-0">
-                      <div className="text-xs font-bold text-[#131722]">
-                        {stock.symbol} <sup className="text-[9px] text-[#F59E0B]">D</sup>
-                      </div>
-                      <div className="text-xs text-[#787B86] truncate">{stock.name}</div>
+                      <div className="text-xs font-bold text-[#131722]">{fund.symbol}</div>
+                      <div className="text-xs text-[#787B86] truncate">{fund.name}</div>
                     </div>
                   </div>
                   <div className="tabular-nums">
                     <div className="text-base font-bold text-[#131722]">
-                      {stock.price} <span className="text-[10px] text-[#787B86] font-normal">{stock.unit}</span>
+                      {fund.price} <span className="text-[10px] text-[#787B86] font-normal">{fund.unit}</span>
                     </div>
                     <div
                       className={`text-xs font-semibold ${
-                        stock.changePercent >= 0 ? 'text-[#089981]' : 'text-[#F23645]'
+                        fund.changePercent >= 0 ? 'text-[#089981]' : 'text-[#F23645]'
                       }`}
                     >
-                      {formatSignedPercent(stock.changePercent)}
+                      {formatSignedPercent(fund.changePercent)}
                     </div>
                   </div>
                 </button>
