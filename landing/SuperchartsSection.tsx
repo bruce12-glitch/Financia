@@ -24,34 +24,34 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({
   onSelectSymbol,
   onOpenTerminal,
 }) => {
-  const [activeSymbol, setActiveSymbol] = useState<string>('AAPL');
+  const [activeSymbol, setActiveSymbol] = useState<string>('GOLDBEES');
   const [timeframe, setTimeframe] = useState<SuperchartTimeframe>('1h');
   const [showVolumeProfile, setShowVolumeProfile] = useState<boolean>(true);
   const [showFibLevels, setShowFibLevels] = useState<boolean>(true);
   const [showEmaLine, setShowEmaLine] = useState<boolean>(true);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [featuresExpanded, setFeaturesExpanded] = useState<boolean>(false);
-  const [liveBtcCandles, setLiveBtcCandles] = useState<SuperchartCandle[] | null>(null);
-  const [liveBtcPrice, setLiveBtcPrice] = useState<number | null>(null);
-  const [btcFeedTag, setBtcFeedTag] = useState<string>('Binance Public Feed');
+  const [liveGoldCandles, setLiveGoldCandles] = useState<SuperchartCandle[] | null>(null);
+  const [liveGoldPrice, setLiveGoldPrice] = useState<number | null>(null);
+  const [goldFeedTag, setGoldFeedTag] = useState<string>('LBMA Spot Feed');
 
-  // Fetch live Binance OHLCV & subscribe to btcusdt@kline_1m WebSocket when BTCUSD is active
+  // Fetch live Binance Spot Gold (PAXGUSDT) OHLCV & subscribe to paxgusdt@kline_1m WebSocket when PAXGUSDT is active
   useEffect(() => {
-    if (activeSymbol !== 'BTCUSD') return;
+    if (activeSymbol !== 'PAXGUSDT') return;
 
     let cancelled = false;
     const binanceInterval = timeframe === '1D' ? '1d' : timeframe;
 
     fetch(
-      `/api/crypto/klines?symbol=BTCUSDT&interval=${encodeURIComponent(binanceInterval)}&limit=14`
+      `/api/gold/klines?symbol=PAXGUSDT&interval=${encodeURIComponent(binanceInterval)}&limit=14`
     )
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { source?: string; candles?: SuperchartCandle[] } | null) => {
         if (cancelled || !data?.candles || data.candles.length === 0) return;
-        setLiveBtcCandles(data.candles);
-        setLiveBtcPrice(data.candles[data.candles.length - 1].close);
-        setBtcFeedTag(
-          data.source === 'binance-public-rest' ? 'Binance Live REST' : 'Cached BTC Feed'
+        setLiveGoldCandles(data.candles);
+        setLiveGoldPrice(data.candles[data.candles.length - 1].close);
+        setGoldFeedTag(
+          data.source === 'binance-spot-gold-rest' ? 'Binance Spot Gold REST' : 'Cached Spot Gold'
         );
       })
       .catch(() => {
@@ -60,7 +60,7 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({
 
     let ws: WebSocket | null = null;
     try {
-      ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1m');
+      ws = new WebSocket('wss://stream.binance.com:9443/ws/paxgusdt@kline_1m');
       ws.onmessage = (evt) => {
         if (cancelled) return;
         try {
@@ -72,9 +72,9 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({
           const closeNum = Number(Number(k.c).toFixed(2));
           if (!Number.isFinite(closeNum) || closeNum <= 0) return;
 
-          setLiveBtcPrice(closeNum);
-          setBtcFeedTag('Binance Live WS');
-          setLiveBtcCandles((prev) => {
+          setLiveGoldPrice(closeNum);
+          setGoldFeedTag('Spot Gold Live WS');
+          setLiveGoldCandles((prev) => {
             if (!prev || prev.length === 0) return prev;
             const next = [...prev];
             const last = next[next.length - 1];
@@ -106,16 +106,16 @@ export const SuperchartsSection: React.FC<SuperchartsSectionProps> = ({
     const base =
       SUPERCHART_INSTRUMENTS.find((item) => item.symbol === activeSymbol) ||
       SUPERCHART_INSTRUMENTS[0];
-    if (activeSymbol === 'BTCUSD' && liveBtcCandles && liveBtcCandles.length > 0) {
-      const firstOpen = liveBtcCandles[0].open || base.lastPrice;
-      const latestClose = liveBtcPrice ?? liveBtcCandles[liveBtcCandles.length - 1].close;
+    if (activeSymbol === 'PAXGUSDT' && liveGoldCandles && liveGoldCandles.length > 0) {
+      const firstOpen = liveGoldCandles[0].open || base.lastPrice;
+      const latestClose = liveGoldPrice ?? liveGoldCandles[liveGoldCandles.length - 1].close;
       const pct =
         firstOpen > 0
           ? Number((((latestClose - firstOpen) / firstOpen) * 100).toFixed(2))
           : base.changePercent;
       return {
         ...base,
-        exchange: btcFeedTag,
+        exchange: goldFeedTag,
         lastPrice: latestClose,
         changePercent: pct,
         candles: liveBtcCandles,
