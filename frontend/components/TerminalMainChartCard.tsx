@@ -585,3 +585,296 @@ export const TerminalMainChartCard: React.FC<TerminalMainChartCardProps> = ({
                         <span className="text-xs text-[#4B5563]">Bollinger Bands (1.8σ)</span>
                         <button
                           type="button"
+                          role="switch"
+                          aria-checked={showBollinger}
+                          onClick={() => setShowBollinger((prev) => !prev)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                            showBollinger ? 'bg-[#D97706]' : 'bg-[#D1D5DB]'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                              showBollinger ? 'translate-x-4.5' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Side-by-Side Secondary Ticker Comparison Bar */}
+      <div className="mb-4 rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] p-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Active Series Chips & Live Comparison Readout */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-mono font-semibold uppercase tracking-wide text-[#4B5563] mr-1">
+              Compare:
+            </span>
+
+            {/* Primary ticker legend chip */}
+            {primaryComparison && (
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#D1D5DB] text-xs font-mono text-[#131722] whitespace-nowrap shrink-0"
+                data-testid={`compare-legend-${primaryComparison.ticker}`}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: primaryComparison.color }}
+                />
+                <span className="font-bold">{primaryComparison.ticker}</span>
+                {isComparing && (
+                  <span
+                    className={`tabular-nums font-semibold ${
+                      (primaryComparison.points[activeIdx]?.pctReturn ?? 0) >= 0
+                        ? 'text-[#089981]'
+                        : 'text-[#F23645]'
+                    }`}
+                  >
+                    {(primaryComparison.points[activeIdx]?.pctReturn ?? 0) >= 0 ? '+' : ''}
+                    {(primaryComparison.points[activeIdx]?.pctReturn ?? 0).toFixed(2)}%
+                  </span>
+                )}
+              </span>
+            )}
+
+            {/* Added secondary ticker chips with remove control */}
+            {comparisonData.tickers.slice(1).map((sec) => {
+              const hoveredPt = sec.points[activeIdx] || sec.points[sec.points.length - 1];
+              const pctVal = hoveredPt?.pctReturn ?? sec.periodReturnPct;
+              const secRsi = sec.rsiSeries[activeIdx];
+              const secQuote = activeSecondaryStocks.find(
+                (q) => q.ticker.toUpperCase() === sec.ticker.toUpperCase()
+              );
+              return (
+                <span
+                  key={sec.ticker}
+                  data-testid={`compare-legend-${sec.ticker}`}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#D1D5DB] text-xs font-mono text-[#131722] whitespace-nowrap shrink-0"
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: sec.color }}
+                  />
+                  <span className="font-bold">{sec.ticker}</span>
+                  <span className="text-[#6B7280] tabular-nums">
+                    {formatCurrency(
+                      hoveredPt?.price ?? sec.spotPrice,
+                      2,
+                      secQuote?.currencyUnit || 'USD'
+                    )}
+                  </span>
+                  <span
+                    className={`tabular-nums font-semibold ${
+                      pctVal >= 0 ? 'text-[#089981]' : 'text-[#F23645]'
+                    }`}
+                  >
+                    {pctVal >= 0 ? '+' : ''}
+                    {pctVal.toFixed(2)}%
+                  </span>
+                  {showRSI && secRsi !== null && (
+                    <span className="text-[11px] text-[#6B7280] tabular-nums">
+                      · RSI {secRsi.toFixed(0)}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeSecondaryTicker(sec.ticker)}
+                    aria-label={`Remove ${sec.ticker} from comparison`}
+                    data-testid={`remove-compare-${sec.ticker}`}
+                    className="ml-0.5 p-0.5 rounded text-[#6B7280] hover:text-[#131722] hover:bg-[#F3F4F6] cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              );
+            })}
+
+            {/* Quick preset suggestions */}
+            {quickCompareOptions.length > 0 &&
+              activeSecondaryStocks.length < MAX_SECONDARY_TICKERS && (
+                <div className="flex flex-wrap items-center gap-1.5 pl-1">
+                  {quickCompareOptions.slice(0, 3).map((peer) => (
+                    <button
+                      key={peer.ticker}
+                      type="button"
+                      data-testid={`quick-compare-${peer.ticker}`}
+                      onClick={() => addSecondaryTicker(peer.ticker)}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white hover:bg-[#EFF6FF] border border-dashed border-[#D1D5DB] hover:border-[#2962FF] text-[11px] font-mono text-[#374151] hover:text-[#2962FF] transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>{peer.ticker}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+          </div>
+
+          {/* Add Custom Ticker Form */}
+          <form onSubmit={handleCompareSubmit} className="flex items-center gap-1.5 shrink-0">
+            <label htmlFor="compare-ticker-input" className="sr-only">
+              Add secondary ticker to compare
+            </label>
+            <input
+              id="compare-ticker-input"
+              data-testid="compare-ticker-input"
+              type="text"
+              value={compareInput}
+              onChange={(e) => {
+                setCompareInput(e.target.value);
+                if (compareError) setCompareError(null);
+              }}
+              placeholder="Add symbol (e.g. SBIGILT)"
+              className="w-44 px-2.5 py-1 rounded-md bg-white border border-[#D1D5DB] focus:border-[#2962FF] text-xs font-mono uppercase placeholder:normal-case placeholder:font-sans placeholder:text-[#6B7280] focus:outline-none"
+            />
+            <button
+              type="submit"
+              data-testid="compare-ticker-add"
+              className="px-2.5 py-1 rounded-md bg-[#131722] hover:bg-[#1F2937] text-white text-xs font-mono font-medium inline-flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Compare</span>
+            </button>
+          </form>
+        </div>
+
+        {compareError && (
+          <div role="alert" className="mt-2 text-[11px] font-mono text-[#DC2626]">
+            {compareError}
+          </div>
+        )}
+      </div>
+
+      {/* Interactive SVG Price / Side-by-Side Comparison + Optional RSI Overlay */}
+      <div className="w-full overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          className="w-full select-none overflow-visible"
+          style={{ height: showRSI ? '320px' : '256px' }}
+          role="img"
+          data-testid="terminal-main-chart-svg"
+          aria-label={
+            isComparing
+              ? `Side-by-side performance comparison for ${comparisonData.tickers
+                  .map((t) => t.ticker)
+                  .join(', ')}`
+              : `${activeStock.ticker} interactive NAV/spot price and technical overlay chart`
+          }
+        >
+          <defs>
+            <linearGradient id="financiaAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2962FF" stopOpacity="0.18" />
+              <stop offset="75%" stopColor="#2962FF" stopOpacity="0.03" />
+              <stop offset="100%" stopColor="#2962FF" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          {/* Horizontal Y-Axis Gridlines (NAV/Spot Price in single mode, % Return in comparison mode) */}
+          {[0, 0.33, 0.66, 1].map((ratio, idx) => {
+            const y = padTop + ratio * pricePlotH;
+            const currencyPrefix = activeStock.currencyUnit === 'INR' ? '₹' : '$';
+            const labelText = isComparing
+              ? `${
+                  comparisonData.maxPct -
+                    ratio * (comparisonData.maxPct - comparisonData.minPct) >=
+                  0
+                    ? '+'
+                    : ''
+                }${(
+                  comparisonData.maxPct -
+                  ratio * (comparisonData.maxPct - comparisonData.minPct)
+                ).toFixed(1)}%`
+              : `${currencyPrefix}${(maxPrice - ratio * (maxPrice - minPrice)).toFixed(0)}`;
+            return (
+              <g key={`grid-${idx}`}>
+                <line
+                  x1={padLeft}
+                  y1={y}
+                  x2={svgWidth - padRight}
+                  y2={y}
+                  stroke="#E5E7EB"
+                  strokeDasharray="3 3"
+                />
+                <text
+                  x={padLeft - 8}
+                  y={y + 4}
+                  textAnchor="end"
+                  className="fill-[#6B7280] text-[10px] font-mono tabular-nums"
+                >
+                  {labelText}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Single-Ticker Mode: Volume Bars, Area, Bollinger, SMA, Primary Line */}
+          {!isComparing && (
+            <>
+              {chartSeries.map((pt, i) => {
+                const x = getX(i);
+                const vHeight = (pt.volume / maxVol) * (pricePlotH * 0.24);
+                const y = padTop + pricePlotH - vHeight;
+                return (
+                  <rect
+                    key={`vol-${i}`}
+                    x={x - 6}
+                    y={y}
+                    width={12}
+                    height={vHeight}
+                    rx={2}
+                    fill="rgba(41, 98, 255, 0.14)"
+                  />
+                );
+              })}
+
+              <path d={areaPath} fill="url(#financiaAreaGrad)" />
+
+              {showBollinger && bollingerUpperPath && (
+                <>
+                  <path
+                    d={bollingerUpperPath}
+                    fill="none"
+                    stroke="#D97706"
+                    strokeWidth={1.25}
+                    strokeDasharray="4 3"
+                  />
+                  <path
+                    d={bollingerLowerPath}
+                    fill="none"
+                    stroke="#D97706"
+                    strokeWidth={1.25}
+                    strokeDasharray="4 3"
+                  />
+                </>
+              )}
+
+              {showSMA && smaPath && (
+                <path
+                  d={smaPath}
+                  fill="none"
+                  stroke="#7C3AED"
+                  strokeWidth={1.5}
+                  strokeDasharray="3 3"
+                />
+              )}
+
+              <path
+                d={linePath}
+                fill="none"
+                stroke="#2962FF"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </>
+          )}
+
+          {/* Side-by-Side Comparison Mode: 0% Baseline + Multiple Ticker Curves */}
+          {isComparing && (
+            <>
+              {comparisonData.minPct <= 0 && comparisonData.maxPct >= 0 && (
