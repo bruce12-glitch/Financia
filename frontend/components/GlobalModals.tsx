@@ -193,43 +193,71 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
             <div className="max-h-80 overflow-y-auto divide-y divide-[#F0F3FA]">
               {filteredSymbols.length === 0 && amfiResults.length === 0 && !amfiLoading ? (
                 <div className="p-8 text-center text-sm text-[#787B86]">
-                  No symbols matched &ldquo;{query}&rdquo;. Try NIFTY, SENSEX, CL1!, or BTCUSD.
+                  No symbols matched &ldquo;{query}&rdquo;. Try GOLDBEES, PPFAS, SBIGILT, NIFTYBEES, or enter a numeric AMFI code.
                 </div>
               ) : (
-                filteredSymbols.map((row) => (
-                  <button
-                    key={`${row.category}-${row.symbol}`}
-                    type="button"
-                    onClick={() => {
-                      onSelectSymbol(row);
-                      onCloseSearch();
-                    }}
-                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#F8F9FD] transition-colors text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="w-8 h-8 rounded-full text-white text-[10px] font-bold flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: row.badgeColor }}
-                      >
-                        {row.badgeText}
+                <>
+                  {filteredSymbols.map((row) => (
+                    <button
+                      key={`${row.category}-${row.symbol}`}
+                      type="button"
+                      onClick={() => {
+                        onSelectSymbol(row);
+                        onCloseSearch();
+                      }}
+                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#F8F9FD] transition-colors text-left cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="w-8 h-8 rounded-full text-white text-[10px] font-bold flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: row.badgeColor }}
+                        >
+                          {row.badgeText}
+                        </span>
+                        <div>
+                          <div className="text-sm font-bold text-[#131722]">{row.symbol}</div>
+                          <div className="text-xs text-[#787B86]">{row.name}</div>
+                        </div>
+                      </div>
+                      <div className="text-right tabular-nums">
+                        <div className="text-sm font-semibold text-[#131722]">{row.price}</div>
+                        <div
+                          className={`text-xs font-semibold ${
+                            row.changePercent >= 0 ? 'text-[#089981]' : 'text-[#F23645]'
+                          }`}
+                        >
+                          {formatSignedPercent(row.changePercent)}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+
+                  {(amfiLoading || amfiResults.length > 0) && (
+                    <div className="bg-[#F8F9FD] px-4 py-2 text-[11px] font-mono uppercase tracking-wide text-[#2962FF] font-semibold">
+                      {amfiLoading ? 'Searching live AMFI scheme registry...' : 'Live AMFI Mutual Fund Schemes'}
+                    </div>
+                  )}
+
+                  {amfiResults.map((scheme) => (
+                    <button
+                      key={`amfi-${scheme.schemeCode}`}
+                      type="button"
+                      onClick={() => {
+                        onOpenInTerminal?.(String(scheme.schemeCode));
+                        onCloseSearch();
+                      }}
+                      className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-[#EFF6FF] transition-colors text-left cursor-pointer"
+                    >
+                      <div className="min-w-0 pr-3">
+                        <div className="text-xs font-bold text-[#131722] truncate">{scheme.schemeName}</div>
+                        <div className="text-[11px] font-mono text-[#787B86]">AMFI {scheme.schemeCode}</div>
+                      </div>
+                      <span className="text-xs font-mono font-semibold text-[#2962FF] shrink-0">
+                        Open NAV ›
                       </span>
-                      <div>
-                        <div className="text-sm font-bold text-[#131722]">{row.symbol}</div>
-                        <div className="text-xs text-[#787B86]">{row.name}</div>
-                      </div>
-                    </div>
-                    <div className="text-right tabular-nums">
-                      <div className="text-sm font-semibold text-[#131722]">{row.price}</div>
-                      <div
-                        className={`text-xs font-semibold ${
-                          row.changePercent >= 0 ? 'text-[#089981]' : 'text-[#F23645]'
-                        }`}
-                      >
-                        {formatSignedPercent(row.changePercent)}
-                      </div>
-                    </div>
-                  </button>
-                ))
+                    </button>
+                  ))}
+                </>
               )}
             </div>
           </div>
@@ -325,7 +353,7 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
                   }}
                   className="px-4 py-2 rounded-lg bg-[#2962FF] text-white text-xs font-semibold hover:bg-[#1E53E5] cursor-pointer"
                 >
-                  Run Full Stock Analysis
+                  Analyze in Fund Terminal
                 </button>
               )}
               <button
