@@ -1,18 +1,50 @@
-import { Router } from 'express';
+import { Request, Response, Router } from 'express';
 import { INITIAL_STOCKS } from '../../frontend/data/marketData.ts';
 import { SUPERCHART_INSTRUMENTS } from '../../frontend/data/tradingViewData.ts';
+import { parseBinanceKlines, parseSecCompanyFacts } from '../../frontend/utils/liveDataParsers.ts';
 import {
-  mergeFinnhubQuote,
-  parseBinanceKlines,
-  parseSecCompanyFacts,
-} from '../../frontend/utils/liveDataParsers.ts';
-import { synthesizeCustomTickerReport } from '../../frontend/utils/stockEngine.ts';
+  buildMultiTickerComparisonSeries,
+  calculateBollingerBands,
+  calculateRSISeries,
+  calculateSMA,
+  getEffectiveRSIPeriod,
+  getSeriesForTimeframe,
+  summarizeRSIZone,
+  synthesizeCustomTickerReport,
+  validateTickerInput,
+} from '../../frontend/utils/stockEngine.ts';
+import { isGeminiConfigured } from '../services/geminiService.ts';
 import {
+  enrichStockQuote,
   fetchAlphaVantageStock,
+  fetchAmfiSchemeHistory,
+  fetchAmfiSchemeLatest,
+  fetchMfnavCategories,
+  fetchMfnavDateLatest,
+  fetchMfnavFundRaw,
+  fetchMfnavNavSeriesRaw,
   fetchSecCompanyFacts,
   fetchWithTimeout,
+  listAmfiSchemes,
   resolveSecCompanyMeta,
+  searchAmfiSchemes,
+  searchMfnavFunds,
 } from '../services/marketDataService.ts';
+import {
+  fetchApiNinjasEtfList,
+  fetchCombinedEtfDossier,
+  fetchFmpEndpoint,
+  fetchTreasuryYieldCurve,
+  searchApiNinjasEtfs,
+} from '../services/etfFmpService.ts';
+
+const VALID_TIMEFRAMES = new Set(['1D', '1W', '1M', '4M', '1Y']);
+type SupportedTimeframe = '1D' | '1W' | '1M' | '4M' | '1Y';
+
+function normalizeTimeframe(raw: unknown): SupportedTimeframe {
+  const candidate = String(raw || '4M').trim().toUpperCase();
+  return VALID_TIMEFRAMES.has(candidate) ? (candidate as SupportedTimeframe) : '4M';
+}
 
 export function createStocksRouter(): Router {
   const router = Router();
