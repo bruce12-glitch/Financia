@@ -51,27 +51,36 @@ export function createStocksRouter(): Router {
 
   router.get('/health', (_req, res) => {
     const configuredKeys = {
+      twelveData: Boolean(process.env.TWELVE_DATA_API_KEY),
+      marketstack: Boolean(process.env.MARKETSTACK_API_KEY),
       finnhub: Boolean(process.env.FINNHUB_API_KEY),
       alpaca: Boolean(process.env.ALPACA_KEY_ID && process.env.ALPACA_SECRET_KEY),
       alphaVantage: Boolean(process.env.ALPHA_VANTAGE_API_KEY),
+      apiNinjas: Boolean(process.env.API_NINJAS_KEY),
       fmp: Boolean(process.env.FMP_API_KEY),
       customMarketApi: Boolean(process.env.MARKET_DATA_API_KEY && process.env.MARKET_DATA_BASE_URL),
       forexApi: Boolean(process.env.FOREX_API_KEY),
       newsApi: Boolean(process.env.NEWS_API_KEY),
+      gemini: isGeminiConfigured(),
     };
 
     const zeroKeyEndpoints = {
-      binancePublicRestAndWs: true,
-      secEdgarCompanyFacts: true,
-      alphaVantageIbmDemo: true,
+      mfnavAnalyticsApi: true,
+      amfiMutualFundNavApi: true,
+      amfiSchemeSearch: true,
+      binanceSpotGoldRestAndWs: true,
+      bullionAndEtfEngine: true,
     };
 
     res.json({
       status: 'ok',
-      service: 'Financia Intelligence API',
+      service: 'Financia Mutual Funds, Gold, Debt & ETF API',
+      assetPillars: ['Mutual Funds', 'Gold & Bullion', 'Debt Funds', 'ETFs'],
       mode: Object.values(configuredKeys).some(Boolean)
         ? 'live-upstream-configured'
         : 'plug-and-play-public-feeds',
+      persistence: 'file-backed-json',
+      geminiConfigured: configuredKeys.gemini,
       zeroKeyEndpoints,
       configuredKeys,
       timestamp: new Date().toISOString(),
@@ -79,9 +88,9 @@ export function createStocksRouter(): Router {
   });
 
   router.get('/quote/:symbol', async (req, res) => {
-    const symbol = String(req.params.symbol || 'NVDA').trim().toUpperCase();
-    if (!/^[A-Z0-9.^]{1,12}$/.test(symbol)) {
-      res.status(400).json({ error: 'Invalid ticker symbol format.' });
+    const symbol = String(req.params.symbol || 'GOLDBEES').trim().toUpperCase();
+    if (!/^[A-Z0-9.^-]{1,14}$/.test(symbol)) {
+      res.status(400).json({ error: 'Invalid symbol format.' });
       return;
     }
 
@@ -149,8 +158,8 @@ export function createStocksRouter(): Router {
     });
   });
 
-  router.get('/crypto/klines', async (req, res) => {
-    const symbol = String(req.query.symbol || 'BTCUSDT')
+  const handleGoldKlines = async (req: Request, res: Response) => {
+    const symbol = String(req.query.symbol || 'PAXGUSDT')
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '');
