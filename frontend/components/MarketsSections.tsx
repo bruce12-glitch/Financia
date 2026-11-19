@@ -612,47 +612,51 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
           </div>
 
           <NewsWireGrid
-            title="Indian stocks news"
-            items={INDIAN_STOCKS_NEWS}
+            title="Mutual fund & ETF news"
+            items={MUTUAL_FUND_NEWS}
             onSelectNews={onSelectNews}
           />
         </section>
 
         {/* ============================================================ */}
-        {/* 2. CRYPTO (PDF Pages 10–13)                                  */}
+        {/* 2. GOLD & PRECIOUS METALS                                    */}
         {/* ============================================================ */}
-        <section id="crypto-section" aria-label="Crypto" className="space-y-10">
+        <section id="gold-section" aria-label="Gold and Precious Metals" className="space-y-10">
           <div>
             <h2 className="text-[28px] font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-              <span>Crypto</span>
+              <span>Gold &amp; Precious Metals</span>
               <ChevronRight className="w-6 h-6" />
             </h2>
-            <div className="text-base font-bold text-[#131722] mb-3">Community trends</div>
+            <div className="text-base font-bold text-[#131722] mb-3">Spot &amp; Sovereign Gold Leaders</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {CRYPTO_ASSETS.slice(2).map((coin) => (
+              {GOLD_BULLION_ASSETS.slice(0, 3).map((asset) => (
                 <button
-                  key={coin.symbol}
+                  key={asset.symbol}
                   type="button"
-                  onClick={() => onSelectSymbol(coin)}
+                  onClick={() => onSelectSymbol(asset)}
                   className="rounded-xl border border-[#E0E3EB] bg-white p-4 text-left hover:border-[#2962FF]/45 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 mb-2">
                     <span
                       className="w-8 h-8 rounded-full text-white text-xs font-bold flex items-center justify-center"
-                      style={{ backgroundColor: coin.badgeColor }}
+                      style={{ backgroundColor: asset.badgeColor }}
                     >
-                      {coin.badgeText}
+                      {asset.badgeText}
                     </span>
-                    <div>
-                      <div className="text-xs font-bold text-[#131722]">{coin.symbol}</div>
-                      <div className="text-xs text-[#787B86]">{coin.name}</div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-[#131722]">{asset.symbol}</div>
+                      <div className="text-xs text-[#787B86] truncate">{asset.name}</div>
                     </div>
                   </div>
                   <div className="text-base font-bold text-[#131722] tabular-nums">
-                    {coin.price} <span className="text-[10px] font-normal text-[#787B86]">{coin.unit}</span>
+                    {asset.price} <span className="text-[10px] font-normal text-[#787B86]">{asset.unit}</span>
                   </div>
-                  <div className="text-xs font-semibold text-[#F23645] tabular-nums">
-                    {formatSignedPercent(coin.changePercent)}
+                  <div
+                    className={`text-xs font-semibold tabular-nums ${
+                      asset.changePercent >= 0 ? 'text-[#089981]' : 'text-[#F23645]'
+                    }`}
+                  >
+                    {formatSignedPercent(asset.changePercent)}
                   </div>
                 </button>
               ))}
@@ -662,16 +666,16 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
             <div>
               <h3 className="text-xl font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-                <span>Crypto gainers</span>
+                <span>Gold &amp; Silver Instruments</span>
                 <ChevronRight className="w-5 h-5" />
               </h3>
               <div className="divide-y divide-[#F0F3FA]">
-                {CRYPTO_GAINERS.map((coin) => (
+                {GOLD_BULLION_ASSETS.map((asset) => (
                   <SymbolBadgeRow
-                    key={coin.symbol}
-                    item={coin}
+                    key={asset.symbol}
+                    item={asset}
                     pillStyle
-                    onClick={() => onSelectSymbol(coin)}
+                    onClick={() => onSelectSymbol(asset)}
                   />
                 ))}
               </div>
@@ -679,14 +683,14 @@ export const MarketsSections: React.FC<MarketsSectionsProps> = ({
 
             <div>
               <h3 className="text-xl font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-                <span>Crypto losers</span>
+                <span>Gilt &amp; Bond Funds</span>
                 <ChevronRight className="w-5 h-5" />
               </h3>
               <div className="divide-y divide-[#F0F3FA]">
-                {CRYPTO_LOSERS.map((coin) => (
+                {DEBT_FUND_LEADERS.slice(0, 4).map((debt) => (
                   <SymbolBadgeRow
-                    key={coin.symbol}
-                    item={coin}
+                    key={debt.symbol}
+                    item={debt}
                     pillStyle
                     onClick={() => onSelectSymbol(coin)}
                   />
