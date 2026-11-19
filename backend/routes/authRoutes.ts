@@ -8,7 +8,7 @@ import {
   validateAuthCredentials,
 } from '../../frontend/utils/authEngine.ts';
 import {
-  accountStore,
+  ensureDemoInvestorAccount,
   extractBearerOrCookieToken,
   hashPassword,
   revokedTokens,
@@ -16,9 +16,11 @@ import {
   verifyAuthToken,
   verifyPassword,
 } from '../services/authService.ts';
+import { financiaStore, PersistenceStore } from '../services/persistenceService.ts';
 
-export function createAuthRouter(): Router {
+export function createAuthRouter(store: PersistenceStore = financiaStore): Router {
   const router = Router();
+  ensureDemoInvestorAccount(store);
 
   router.post('/register', (req, res) => {
     const body = (req.body || {}) as {
@@ -46,7 +48,7 @@ export function createAuthRouter(): Router {
       return;
     }
 
-    if (accountStore.has(email)) {
+    if (store.hasAccount(email)) {
       res.status(409).json({
         error: 'An account with this email already exists. Please log in instead.',
       });
@@ -64,7 +66,7 @@ export function createAuthRouter(): Router {
       createdAt: new Date().toISOString(),
     };
 
-    accountStore.set(email, {
+    store.setAccount(email, {
       user,
       salt,
       passwordHash: hashPassword(password, salt),
@@ -99,7 +101,7 @@ export function createAuthRouter(): Router {
       return;
     }
 
-    const record = accountStore.get(email);
+    const record = store.getAccount(email);
     if (!record || !verifyPassword(password, record.salt, record.passwordHash)) {
       res.status(401).json({
         error: 'Invalid email or password. Try demo@financia.io / DemoPass2026! or sign up.',
@@ -137,7 +139,7 @@ export function createAuthRouter(): Router {
     const chosen = defaultProfiles[provider as Exclude<AuthProvider, 'email'>];
     const email = normalizeEmail(body.email || chosen.email);
     const preferredName = (body.name || chosen.name).trim();
-    const existing = accountStore.get(email);
+    const existing = store.getAccount(email);
 
     let user: AuthUser;
     if (existing) {
@@ -152,7 +154,7 @@ export function createAuthRouter(): Router {
         initials,
         createdAt: new Date().toISOString(),
       };
-      accountStore.set(email, {
+      store.setAccount(email, {
         user,
         salt: crypto.randomBytes(16).toString('hex'),
         passwordHash: '',
