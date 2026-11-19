@@ -51,9 +51,9 @@ function describeArc(cx: number, cy: number, radius: number, startAngle: number,
 }
 
 const SCOPE_OPTIONS: Array<{ id: SentimentScope; label: string }> = [
-  { id: 'global', label: 'All Markets' },
-  { id: 'crypto', label: 'Crypto' },
-  { id: 'india', label: 'India' },
+  { id: 'global', label: 'All 4 Pillars' },
+  { id: 'crypto', label: 'Gold & Bullion' },
+  { id: 'india', label: 'Mutual Funds & Debt' },
 ];
 
 const DEFAULT_WIRE_NEWS: WireNewsItem[] = [
