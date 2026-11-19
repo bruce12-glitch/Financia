@@ -73,6 +73,8 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [catFilter, setCatFilter] = useState<'all' | MarketSymbolRow['category']>('all');
+  const [amfiResults, setAmfiResults] = useState<Array<{ schemeCode: number; schemeName: string }>>([]);
+  const [amfiLoading, setAmfiLoading] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -100,6 +102,36 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
     onSelectIdea,
   ]);
 
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!searchOpen || trimmed.length < 3 || (catFilter !== 'all' && catFilter !== 'mutual_funds')) {
+      setAmfiResults([]);
+      setAmfiLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setAmfiLoading(true);
+    const timer = window.setTimeout(() => {
+      fetch(`/api/mf/search?q=${encodeURIComponent(trimmed)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { results?: Array<{ schemeCode: number; schemeName: string }> } | null) => {
+          if (cancelled) return;
+          setAmfiResults((data?.results || []).slice(0, 6));
+          setAmfiLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setAmfiResults([]);
+          setAmfiLoading(false);
+        });
+    }, 240);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query, searchOpen, catFilter]);
+
   const filteredSymbols = useMemo(() => {
     return filterSymbolsByQuery(
       ALL_SEARCHABLE_SYMBOLS,
@@ -126,7 +158,7 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search symbol, company, FX pair, crypto, or commodity (e.g. NIFTY, EURUSD, CL1!)..."
+                placeholder="Search mutual fund, gold, debt fund, ETF, FX, or AMFI code (e.g. PPFAS, GOLDBEES, SBIGILT, 125497)..."
                 className="flex-1 text-sm text-[#131722] placeholder-[#9598A1] focus:outline-none"
               />
               <button
@@ -140,7 +172,7 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
             </div>
 
             <div className="px-4 py-2 border-b border-[#F0F3FA] flex flex-wrap gap-1.5 bg-[#F8F9FD]">
-              {(['all', 'indices', 'indian_stocks', 'forex', 'crypto', 'futures'] as const).map(
+              {(['all', 'mutual_funds', 'gold', 'debt_funds', 'etfs', 'indices', 'forex'] as const).map(
                 (cat) => (
                   <button
                     key={cat}
@@ -159,7 +191,7 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
             </div>
 
             <div className="max-h-80 overflow-y-auto divide-y divide-[#F0F3FA]">
-              {filteredSymbols.length === 0 ? (
+              {filteredSymbols.length === 0 && amfiResults.length === 0 && !amfiLoading ? (
                 <div className="p-8 text-center text-sm text-[#787B86]">
                   No symbols matched &ldquo;{query}&rdquo;. Try NIFTY, SENSEX, CL1!, or BTCUSD.
                 </div>
