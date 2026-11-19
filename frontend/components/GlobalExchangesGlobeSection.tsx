@@ -688,17 +688,17 @@ export const GlobalExchangesGlobeSection: React.FC<GlobalExchangesGlobeSectionPr
   return (
     <section
       id="global-exchanges-globe"
-      aria-label="Explore available markets — 3D Global Stock Exchanges"
+      aria-label="Explore available markets — 3D Global Fund, ETF & Bullion Hubs"
       className="relative w-full bg-[#000000] text-white border-t border-[#1E222D] overflow-hidden"
     >
       {/* Top Centered Header Arch Matching PDF Reference */}
       <div className="relative z-20 flex flex-col items-center pt-5 px-4 pointer-events-none">
         <div className="px-6 py-1.5 rounded-t-2xl border border-b-0 border-[#2A2E39] bg-[#090B10] text-xs font-medium text-[#E5E7EB]">
-          Explore available markets
+          Explore global fund, ETF &amp; bullion hubs
         </div>
         <div className="w-full max-w-4xl h-px bg-gradient-to-r from-transparent via-[#2A2E39] to-transparent" />
         <p className="mt-2.5 text-center text-xs text-[#9598A1]">
-          Interactive 3D Market Atlas · {GLOBAL_STOCK_EXCHANGES.length} global stock exchanges — drag to spin or select an exchange beacon
+          Interactive 3D Market Atlas · {GLOBAL_STOCK_EXCHANGES.length} global fund, ETF &amp; bullion hubs — drag to spin or select a hub beacon
         </p>
       </div>
 
@@ -790,7 +790,7 @@ export const GlobalExchangesGlobeSection: React.FC<GlobalExchangesGlobeSectionPr
             className="mb-1.5 px-3 py-1 rounded-t-lg bg-[#0E121B]/95 border border-b-0 border-[#2A2E39] text-[11px] font-medium text-[#B2B5BE] hover:text-white inline-flex items-center gap-1.5 cursor-pointer"
           >
             <Globe2 className="w-3.5 h-3.5 text-[#60A5FA]" />
-            <span>{dockCollapsed ? 'Show Exchange Navigator' : 'Hide Controls'}</span>
+            <span>{dockCollapsed ? 'Show Hub Navigator' : 'Hide Controls'}</span>
             {dockCollapsed ? (
               <ChevronUp className="w-3.5 h-3.5" />
             ) : (
