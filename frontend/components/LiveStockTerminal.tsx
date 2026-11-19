@@ -171,7 +171,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
         id: 3,
         kind: 'thinking',
         label: `Tier 2 Adversarial Case Construction (Bull vs. Bear vs. Base)`,
-        detail: `Cross-examining gross margin trajectory, RPO backlog conversion, and Item 1A Risk Factors to eliminate pre-training assumptions.`,
+        detail: `Cross-examining TER fee drag, duration convexity, central-bank gold reserve demand, and tracking error to eliminate ungrounded assumptions.`,
         startTime: now + 790,
         endTime: now + 1180,
       },
@@ -180,7 +180,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
         kind: 'tool_result',
         label: `Tier 3 Executive Verdict & Conviction Score Synthesized`,
         toolName: 'report_schema_validator',
-        detail: `Validated structured ReportData JSON for ${targetTicker} with zero ungrounded claims.`,
+        detail: `Validated structured ReportData JSON for ${targetTicker} across Mutual Fund, Gold, Debt & ETF risk controls.`,
         startTime: now + 1180,
         endTime: now + 1450,
       },
@@ -244,95 +244,10 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
     }, 3500);
   };
 
-  // SVG Chart Geometry Calculations
-  const svgWidth = 760;
-  const svgHeight = 270;
-  const padLeft = 52;
-  const padRight = 20;
-  const padTop = 20;
-  const padBottom = 38;
-  const plotW = svgWidth - padLeft - padRight;
-  const plotH = svgHeight - padTop - padBottom;
-
-  const minPrice = useMemo(() => {
-    const lows = chartSeries.map((c) => c.low);
-    const bLows = bollingerSeries.map((b) => b.lower).filter((v): v is number => v !== null);
-    return Math.min(...lows, ...(bLows.length ? bLows : lows)) * 0.985;
-  }, [chartSeries, bollingerSeries]);
-
-  const maxPrice = useMemo(() => {
-    const highs = chartSeries.map((c) => c.high);
-    const bHighs = bollingerSeries.map((b) => b.upper).filter((v): v is number => v !== null);
-    return Math.max(...highs, ...(bHighs.length ? bHighs : highs)) * 1.015;
-  }, [chartSeries, bollingerSeries]);
-
-  const maxVol = useMemo(() => {
-    return Math.max(...chartSeries.map((c) => c.volume), 1);
-  }, [chartSeries]);
-
-  const getX = (index: number) => {
-    if (chartSeries.length <= 1) return padLeft;
-    return padLeft + (index / (chartSeries.length - 1)) * plotW;
-  };
-
-  const getY = (price: number) => {
-    const range = Math.max(maxPrice - minPrice, 0.01);
-    return padTop + plotH - ((price - minPrice) / range) * plotH;
-  };
-
-  const linePath = useMemo(() => {
-    if (chartSeries.length === 0) return '';
-    return chartSeries
-      .map((pt, i) => `${i === 0 ? 'M' : 'L'} ${getX(i).toFixed(1)} ${getY(pt.price).toFixed(1)}`)
-      .join(' ');
-  }, [chartSeries, minPrice, maxPrice]);
-
-  const areaPath = useMemo(() => {
-    if (!linePath || chartSeries.length === 0) return '';
-    const lastX = getX(chartSeries.length - 1).toFixed(1);
-    const firstX = getX(0).toFixed(1);
-    const bottomY = (padTop + plotH).toFixed(1);
-    return `${linePath} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
-  }, [linePath, chartSeries]);
-
-  const smaPath = useMemo(() => {
-    const validPoints: string[] = [];
-    smaSeries.forEach((val, idx) => {
-      if (val !== null) {
-        validPoints.push(`${validPoints.length === 0 ? 'M' : 'L'} ${getX(idx).toFixed(1)} ${getY(val).toFixed(1)}`);
-      }
-    });
-    return validPoints.join(' ');
-  }, [smaSeries, minPrice, maxPrice]);
-
-  const bollingerUpperPath = useMemo(() => {
-    const pts: string[] = [];
-    bollingerSeries.forEach((b, idx) => {
-      if (b.upper !== null) {
-        pts.push(`${pts.length === 0 ? 'M' : 'L'} ${getX(idx).toFixed(1)} ${getY(b.upper).toFixed(1)}`);
-      }
-    });
-    return pts.join(' ');
-  }, [bollingerSeries, minPrice, maxPrice]);
-
-  const bollingerLowerPath = useMemo(() => {
-    const pts: string[] = [];
-    bollingerSeries.forEach((b, idx) => {
-      if (b.lower !== null) {
-        pts.push(`${pts.length === 0 ? 'M' : 'L'} ${getX(idx).toFixed(1)} ${getY(b.lower).toFixed(1)}`);
-      }
-    });
-    return pts.join(' ');
-  }, [bollingerSeries, minPrice, maxPrice]);
-
-  const activePoint = hoveredPointIdx !== null && chartSeries[hoveredPointIdx]
-    ? chartSeries[hoveredPointIdx]
-    : chartSeries[chartSeries.length - 1];
-
   return (
     <section
       id="live-terminal"
-      aria-label="Financia Live Stock Analysis Terminal"
+      aria-label="Financia Live Mutual Fund, Gold, Debt & ETF Terminal"
       className="relative w-full bg-white text-[#131722] pt-16 lg:pt-20 pb-16 border-b border-[#E5E7EB]"
     >
       <div className="max-w-[1240px] mx-auto px-6">
@@ -345,7 +260,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                 <span className="w-0.5 h-3 bg-[#131722]" />
                 <span className="w-0.5 h-2 bg-[#2962FF]" />
               </span>
-              <span>Financia Multi-Agent Research Engine</span>
+              <span>Financia 4-Pillar Research Engine</span>
               <span aria-hidden="true">·</span>
               <span>Not a Trading Venue</span>
             </div>
@@ -353,7 +268,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
               className="font-display font-semibold text-[#131722] tracking-tight"
               style={{ fontSize: 'clamp(1.75rem, 3vw, 2.5rem)', textWrap: 'balance' }}
             >
-              Live Stock Telemetry &amp; SEC Filing Synthesis
+              Live Mutual Fund, Gold, Debt &amp; ETF Telemetry
             </h2>
           </div>
 
@@ -408,7 +323,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
             <div className="flex items-center gap-3 pl-3 py-1.5 flex-1">
               <Search className="w-5 h-5 text-[#2962FF] shrink-0" />
               <label htmlFor="financia-ticker-input" className="sr-only">
-                Stock or ETF Ticker Symbol
+                Mutual Fund, Gold, Debt Fund, ETF, or AMFI Scheme Code
               </label>
               <input
                 id="financia-ticker-input"
@@ -418,7 +333,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                   setTickerInput(e.target.value);
                   if (inputError) setInputError(null);
                 }}
-                placeholder="Enter any stock or ETF ticker symbol (e.g., NVDA, AAPL, MSFT, TSLA, PLTR, QQQ)..."
+                placeholder="Enter Mutual Fund, Gold, Debt Fund, ETF, or AMFI code (e.g., PPFAS, 125497, GOLDBEES, SBIGILT, NIFTYBEES)..."
                 className="w-full bg-transparent text-[#131722] font-mono text-sm uppercase placeholder:normal-case placeholder:font-sans placeholder:text-[#6B7280] focus:outline-none"
               />
             </div>
@@ -437,7 +352,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                 disabled={isAnalyzing}
                 className="px-6 py-2.5 rounded-lg bg-[#131722] text-white hover:bg-[#1F2937] disabled:opacity-50 font-semibold text-sm transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                {isAnalyzing ? 'Synthesizing Filings...' : 'Analyze Ticker'}
+                {isAnalyzing ? 'Synthesizing Data...' : 'Analyze Asset'}
               </button>
             </div>
           </div>
@@ -456,10 +371,10 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
           <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-[#6B7280]">
             <span>Instant live endpoints:</span>
             {[
-              { symbol: 'IBM', note: 'Alpha Vantage Live' },
-              { symbol: 'AAPL', note: 'SEC EDGAR Live' },
-              { symbol: 'NVDA', note: 'SEC EDGAR Live' },
-              { symbol: 'INFY', note: 'NSE/ADR Synthesis' },
+              { symbol: '125497', note: 'AMFI MFAPI Live' },
+              { symbol: 'PPFAS', note: 'AMFI 122639' },
+              { symbol: 'GOLDBEES', note: 'Marketstack ETF / Gold' },
+              { symbol: 'PAXGUSDT', note: 'LBMA Spot Gold' },
             ].map((item) => (
               <button
                 key={item.symbol}
@@ -581,7 +496,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                 <div className="text-xs text-[#6B7280] truncate mb-2">{item.name}</div>
                 <div className="flex items-baseline justify-between">
                   <span className="font-mono font-semibold text-sm text-[#131722] tabular-nums">
-                    {formatCurrency(item.price)}
+                    {formatCurrency(item.price, 2, item.currencyUnit || 'INR')}
                   </span>
                   <span className="text-[11px] font-mono text-[#2962FF] tabular-nums">
                     Score {item.convictionScore}
