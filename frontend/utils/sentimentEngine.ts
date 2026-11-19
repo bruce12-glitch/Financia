@@ -650,13 +650,13 @@ export function computeCompositeMarketSentiment(params: {
         drivers: [
           {
             id: 'cmom',
-            label: 'BTC price trend',
+            label: 'Spot Gold (LBMA/PAXG)',
             score: cryptoMomentum,
             signal: cryptoAvgPct >= 0 ? 'Accumulation' : 'Pullback',
           },
           {
             id: 'cnews',
-            label: 'Crypto news volume',
+            label: 'Bullion & debt news',
             score: newsSignalCrypto,
             signal:
               cryptoNews.totalArticles > 0
@@ -665,13 +665,13 @@ export function computeCompositeMarketSentiment(params: {
           },
           {
             id: 'cbrd',
-            label: 'Altcoin breadth',
+            label: 'Gold & Metal ETFs',
             score: cryptoBreadth,
-            signal: cryptoBreadth >= 50 ? 'Participating' : 'Lagging',
+            signal: cryptoBreadth >= 50 ? 'Inflows' : 'Rangebound',
           },
           {
             id: 'cdom',
-            label: 'Spot flow impulse',
+            label: 'Safe-haven impulse',
             score: clampSentimentScore(cryptoScore * 0.85 + 8),
             signal: cryptoZone.zone,
           },
@@ -680,11 +680,11 @@ export function computeCompositeMarketSentiment(params: {
           ? liveCryptoFng.history7d
           : cryptoHistory90d.slice(-7).map((p) => p.score),
         history90d: cryptoHistory90d,
-        sourceLabel: liveCryptoFng ? 'Alternative.me Live F&G' : 'Financia Crypto News & Price',
+        sourceLabel: liveCryptoFng ? 'Live LBMA Spot & Macro Pulse' : 'Financia Gold Bullion & Debt Wire',
       },
       india: {
         scope: 'india',
-        title: 'India Equities Sentiment',
+        title: 'Mutual Funds & Debt',
         score: indiaScore,
         zone: indiaZone.zone,
         color: indiaZone.color,
@@ -696,20 +696,20 @@ export function computeCompositeMarketSentiment(params: {
         newsSignals: indiaNews,
         summary:
           indiaScore >= 56
-            ? 'Nifty 50 price trends, upbeat corporate news volume, and calmer yields support domestic conviction.'
+            ? 'Record AMFI monthly SIP inflows, steady Nifty ETF accumulation, and benign 10Y G-Sec yields lift conviction.'
             : indiaScore <= 44
-              ? 'Defensive headline flow and currency pressure weigh on domestic large-cap momentum.'
-              : 'Steady domestic news velocity keeps Nifty and Sensex in constructive equilibrium.',
+              ? 'G-Sec yield volatility and INR swings tilt allocation toward Liquid BeES and AAA corporate debt funds.'
+              : 'Steady domestic SIP collections and RBI liquidity balance Flexi Cap, Gilt, and Index ETF flows.',
         drivers: [
           {
             id: 'imom',
-            label: 'Nifty / Sensex trend',
+            label: 'AMFI & Nifty ETF trend',
             score: indiaMomentum,
-            signal: indiaAvg >= 0 ? 'Positive' : 'Consolidating',
+            signal: indiaAvg >= 0 ? 'Net Inflow' : 'Consolidating',
           },
           {
             id: 'inews',
-            label: 'India news volume',
+            label: 'MF & debt news',
             score: newsSignalIndia,
             signal:
               indiaNews.totalArticles > 0
@@ -718,20 +718,20 @@ export function computeCompositeMarketSentiment(params: {
           },
           {
             id: 'ibrd',
-            label: 'Large-cap breadth',
+            label: 'Scheme breadth',
             score: indiaBreadth,
-            signal: 'Domestic Lead',
+            signal: 'SIP Lead',
           },
           {
             id: 'ifx',
-            label: 'INR FX stability',
+            label: 'INR & G-Sec carry',
             score: inrStability,
-            signal: usdinr && usdinr.changePercent < 0 ? 'Firm INR' : 'USD Bid',
+            signal: usdinr && usdinr.changePercent < 0 ? 'Firm INR' : 'Yield Focus',
           },
         ],
         history7d: indiaHistory90d.slice(-7).map((p) => p.score),
         history90d: indiaHistory90d,
-        sourceLabel: 'NSE · India News & Price Pulse',
+        sourceLabel: 'AMFI · MF, Gilt & Index ETF Pulse',
       },
     },
   };
