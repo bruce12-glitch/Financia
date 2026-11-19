@@ -114,3 +114,119 @@ export function createWorkspaceRouter(store: PersistenceStore = financiaStore): 
       res.status(404).json({ error: 'Alert not found.' });
       return;
     }
+    res.json({ alert: updated });
+  });
+
+  router.delete('/alerts/:id', (req, res) => {
+    const user = getAuthenticatedUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required to delete alerts.' });
+      return;
+    }
+
+    const alertId = String(req.params.id || '').trim();
+    const removed = store.deleteUserAlert(user.id, alertId);
+    if (!removed) {
+      res.status(404).json({ error: 'Alert not found.' });
+      return;
+    }
+    res.json({ ok: true, alerts: store.getUserAlerts(user.id) });
+  });
+
+  // --- Watchlist & Side-by-Side Comparison Tickers (Authenticated) ---
+  router.get('/watchlist', (req, res) => {
+    const user = getAuthenticatedUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required to access saved watchlist.' });
+      return;
+    }
+    res.json({ watchlist: store.getUserWatchlist(user.id) });
+  });
+
+  router.put('/watchlist', (req, res) => {
+    const user = getAuthenticatedUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required to update watchlist.' });
+      return;
+    }
+
+    const body = (req.body || {}) as {
+      primaryTicker?: string;
+      watchlistTickers?: unknown;
+      comparisonTickers?: unknown;
+    };
+
+    if (body.primaryTicker !== undefined) {
+      const check = validateTickerInput(String(body.primaryTicker));
+      if (!check.valid) {
+        res.status(400).json({ error: check.error || 'Invalid primary ticker.' });
+        return;
+      }
+    }
+
+    const watchlist = store.setUserWatchlist(user.id, {
+      primaryTicker: typeof body.primaryTicker === 'string' ? body.primaryTicker : undefined,
+      watchlistTickers: Array.isArray(body.watchlistTickers)
+        ? body.watchlistTickers.map(String)
+        : undefined,
+      comparisonTickers: Array.isArray(body.comparisonTickers)
+        ? body.comparisonTickers.map(String)
+        : undefined,
+    });
+    res.json({ watchlist });
+  });
+
+  // --- Institutional Research Inquiries ---
+  router.post('/inquiries', (req, res) => {
+    const body = (req.body || {}) as {
+      name?: string;
+      email?: string;
+      phone?: string;
+      message?: string;
+    };
+
+    const validation = validateInquiryForm({
+      name: String(body.name || ''),
+      email: String(body.email || ''),
+      phone: String(body.phone || ''),
+      message: String(body.message || ''),
+    });
+
+    if (!validation.valid) {
+      const firstErr =
+        validation.errors.name ||
+        validation.errors.email ||
+        validation.errors.phone ||
+        validation.errors.message ||
+        'Invalid inquiry fields.';
+      res.status(400).json({ error: firstErr, fieldErrors: validation.errors });
+      return;
+    }
+
+    const user = getAuthenticatedUser(req);
+    const inquiry: ResearchInquiry = {
+      id: `inq_${crypto.randomUUID().slice(0, 10)}`,
+      userId: user?.id || null,
+      name: String(body.name).trim().slice(0, 100),
+      email: String(body.email).trim().slice(0, 160),
+      phone: String(body.phone).trim().slice(0, 40),
+      message: String(body.message).trim().slice(0, 2000),
+      status: 'received',
+      createdAt: new Date().toISOString(),
+    };
+
+    store.addInquiry(inquiry);
+    res.status(201).json({ inquiry });
+  });
+
+  router.get('/inquiries', (req, res) => {
+    const user = getAuthenticatedUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required to list inquiries.' });
+      return;
+    }
+    res.json({ inquiries: store.listUserInquiries(user.id) });
+  });
+
+  return router;
+}
