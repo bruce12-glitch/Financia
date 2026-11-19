@@ -364,7 +364,7 @@ export default function App() {
   // Enrich active asset with live AMFI MFAPI / Marketstack / Binance backend data
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/stocks/analyze?ticker=${encodeURIComponent(selectedTicker)}`)
+    fetch(`/api/funds/analyze?ticker=${encodeURIComponent(selectedTicker)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { stock?: StockQuote } | null) => {
         if (cancelled || !data?.stock) return;
@@ -391,7 +391,7 @@ export default function App() {
       if (!normalized) return;
 
       try {
-        const res = await fetch(`/api/stocks/analyze?ticker=${encodeURIComponent(normalized)}`);
+        const res = await fetch(`/api/funds/analyze?ticker=${encodeURIComponent(normalized)}`);
         if (res.ok) {
           const data = (await res.json()) as { stock?: StockQuote };
           if (data.stock) {
@@ -445,29 +445,120 @@ export default function App() {
     [handleOpenInTerminal]
   );
 
+  const persistWatchlistToServer = useCallback(
+    (primary: string, comparison: string[]) => {
+      const token = authSession?.token;
+      if (!token) return;
+      void fetch('/api/watchlist', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          primaryTicker: primary,
+          comparisonTickers: comparison,
+        }),
+      }).catch(() => {
+        // Non-fatal
+      });
+    },
+    [authSession?.token]
+  );
+
+  const handleSelectPrimaryTicker = useCallback(
+    (ticker: string) => {
+      const normalized = ticker.trim().toUpperCase();
+      setSelectedTicker(normalized);
+      persistWatchlistToServer(normalized, comparisonTickers);
+    },
+    [comparisonTickers, persistWatchlistToServer]
+  );
+
+  const handleComparisonTickersChange = useCallback(
+    (nextTickers: string[]) => {
+      setComparisonTickers(nextTickers);
+      persistWatchlistToServer(selectedTicker, nextTickers);
+    },
+    [selectedTicker, persistWatchlistToServer]
+  );
+
   const handleSaveAlert = useCallback(
     (draft: Omit<PriceAlert, 'id' | 'createdAt'>) => {
+      const tempId = `alrt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const next: PriceAlert = {
         ...draft,
-        id: `alrt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: tempId,
         createdAt: new Date().toISOString(),
       };
       setAlerts((prev) => [next, ...prev]);
+
+      const token = authSession?.token;
+      if (!token) return;
+
+      void fetch('/api/alerts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(draft),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { alert?: PriceAlert } | null) => {
+          const savedAlert = data?.alert;
+          if (!savedAlert) return;
+          setAlerts((prev) =>
+            prev.map((item) => (item.id === tempId ? savedAlert : item))
+          );
+        })
+        .catch(() => {
+          // Keep optimistic local alert
+        });
     },
-    []
+    [authSession?.token]
   );
 
-  const handleDeleteAlert = useCallback((id: string) => {
-    setAlerts((prev) => prev.filter((item) => item.id !== id));
-  }, []);
+  const handleDeleteAlert = useCallback(
+    (id: string) => {
+      setAlerts((prev) => prev.filter((item) => item.id !== id));
+      const token = authSession?.token;
+      if (!token) return;
+      void fetch(`/api/alerts/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {
+        // Non-fatal
+      });
+    },
+    [authSession?.token]
+  );
 
-  const handleToggleAlertNotification = useCallback((id: string) => {
-    setAlerts((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, notificationsEnabled: !item.notificationsEnabled } : item
-      )
-    );
-  }, []);
+  const handleToggleAlertNotification = useCallback(
+    (id: string) => {
+      let nextEnabled = true;
+      setAlerts((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          nextEnabled = !item.notificationsEnabled;
+          return { ...item, notificationsEnabled: nextEnabled };
+        })
+      );
+      const token = authSession?.token;
+      if (!token) return;
+      void fetch(`/api/alerts/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ notificationsEnabled: nextEnabled }),
+      }).catch(() => {
+        // Non-fatal
+      });
+    },
+    [authSession?.token]
+  );
 
   const showFrontendWorkspace = Boolean(authSession && activeView === 'frontend');
 
