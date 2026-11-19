@@ -13,9 +13,9 @@ interface EarningsCalendarTabProps {
 }
 
 const MARKET_FILTERS: Array<{ id: EarningsMarketScope; label: string }> = [
-  { id: 'all', label: 'All Markets' },
-  { id: 'us', label: 'US Equities' },
-  { id: 'india', label: 'India NSE' },
+  { id: 'all', label: 'All 4 Pillars' },
+  { id: 'us', label: 'Global ETFs & Fed' },
+  { id: 'india', label: 'India AMFI & RBI' },
 ];
 
 export const EarningsCalendarTab: React.FC<EarningsCalendarTabProps> = ({
@@ -36,8 +36,8 @@ export const EarningsCalendarTab: React.FC<EarningsCalendarTabProps> = ({
     setErrorMsg(null);
     try {
       const url = forceRefresh
-        ? '/api/earnings-calendar?refresh=1'
-        : '/api/earnings-calendar';
+        ? '/api/policy-calendar?refresh=1'
+        : '/api/policy-calendar';
       const res = await fetch(url);
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
@@ -49,13 +49,13 @@ export const EarningsCalendarTab: React.FC<EarningsCalendarTabProps> = ({
       if (Array.isArray(data.events) && data.events.length > 0) {
         setEvents(data.events);
         setSourceLabel(
-          data.source === 'finnhub-live-earnings'
-            ? 'Finnhub Live Calendar'
-            : 'Financia Consensus Feed'
+          data.source === 'finnhub-etf-calendar'
+            ? 'Live ETF & Policy Feed'
+            : 'Financia 4-Pillar Policy Schedule'
         );
       }
     } catch {
-      setErrorMsg('Live earnings endpoint unavailable — showing cached quarterly schedule.');
+      setErrorMsg('Live policy calendar endpoint unavailable — showing cached 4-pillar schedule.');
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +82,7 @@ export const EarningsCalendarTab: React.FC<EarningsCalendarTabProps> = ({
     <section
       id="earnings-calendar-panel"
       data-testid="earnings-calendar-tab-panel"
-      aria-label="Upcoming Quarterly Earnings Calendar"
+      aria-label="Upcoming NFO, SGB & Policy Calendar"
       className="rounded-2xl border border-[#E0E3EB] bg-white p-5 md:p-6"
     >
       {/* Header Row */}
@@ -91,7 +91,7 @@ export const EarningsCalendarTab: React.FC<EarningsCalendarTabProps> = ({
           <div className="flex items-center gap-2">
             <CalendarClock className="w-5 h-5 text-[#2962FF]" aria-hidden="true" />
             <h2 className="text-xl md:text-2xl font-display font-bold text-[#131722]">
-              Quarterly Earnings Calendar
+              NFO, SGB &amp; Policy Calendar
             </h2>
           </div>
           <p className="text-xs text-[#787B86] mt-1 flex flex-wrap items-center gap-1.5 tabular-nums">
