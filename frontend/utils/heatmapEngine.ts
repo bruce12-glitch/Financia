@@ -69,56 +69,105 @@ export interface D3TreemapLayoutResult {
 }
 
 export const HEATMAP_STOCKS: HeatmapStockTile[] = [
-  // Global Equities
-  { symbol: 'NVDA', name: 'NVIDIA Corp.', sector: 'Technology', market: 'global', marketCapB: 3390, price: '138.60', unit: 'USD', changePercent: 3.6, sparkline: [130, 132, 134, 135.5, 137, 138.6] },
-  { symbol: 'AAPL', name: 'Apple Inc.', sector: 'Technology', market: 'global', marketCapB: 3450, price: '228.45', unit: 'USD', changePercent: 1.4, sparkline: [224, 225, 226, 227, 228.45] },
-  { symbol: 'MSFT', name: 'Microsoft Corp.', sector: 'Technology', market: 'global', marketCapB: 3180, price: '462.10', unit: 'USD', changePercent: 1.18, sparkline: [454, 456, 458, 460, 462.1] },
-  { symbol: 'AMD', name: 'Advanced Micro Devices', sector: 'Technology', market: 'global', marketCapB: 274, price: '168.90', unit: 'USD', changePercent: 3.78, sparkline: [160, 162, 165, 167, 168.9] },
-  { symbol: 'INTC', name: 'Intel Corp.', sector: 'Technology', market: 'global', marketCapB: 108, price: '23.40', unit: 'USD', changePercent: -2.45, sparkline: [24.2, 24.0, 23.8, 23.6, 23.4] },
+  // Global ETFs, Bullion & Bond Benchmarks (marketCapB weights reflect Fund AUM / ETF Size in $B)
+  { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', sector: 'Broad Index ETFs', market: 'global', marketCapB: 625, price: '598.40', unit: 'USD', changePercent: 0.42, sparkline: [592, 594, 595.5, 597, 598.4] },
+  { symbol: 'VOO', name: 'Vanguard S&P 500 ETF', sector: 'Broad Index ETFs', market: 'global', marketCapB: 585, price: '549.10', unit: 'USD', changePercent: 0.45, sparkline: [543, 545, 546.5, 548, 549.1] },
+  { symbol: 'QQQ', name: 'Invesco QQQ Trust ETF', sector: 'Broad Index ETFs', market: 'global', marketCapB: 315, price: '514.20', unit: 'USD', changePercent: -0.35, sparkline: [518, 517, 516, 515, 514.2] },
+  { symbol: 'VTI', name: 'Vanguard Total Stock ETF', sector: 'Broad Index ETFs', market: 'global', marketCapB: 455, price: '294.15', unit: 'USD', changePercent: 0.39, sparkline: [291.5, 292.2, 292.9, 293.5, 294.15] },
 
-  { symbol: 'META', name: 'Meta Platforms', sector: 'Communication', market: 'global', marketCapB: 1480, price: '588.40', unit: 'USD', changePercent: 1.54, sparkline: [576, 580, 583, 586, 588.4] },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.', sector: 'Communication', market: 'global', marketCapB: 2240, price: '184.20', unit: 'USD', changePercent: -0.62, sparkline: [186, 185.5, 185, 184.6, 184.2] },
-  { symbol: 'NFLX', name: 'Netflix Inc.', sector: 'Communication', market: 'global', marketCapB: 355, price: '822.10', unit: 'USD', changePercent: 0.94, sparkline: [812, 815, 818, 820, 822.1] },
+  { symbol: 'GLD', name: 'SPDR Gold Shares ETF', sector: 'Gold & Bullion ETFs', market: 'global', marketCapB: 78.6, price: '306.40', unit: 'USD', changePercent: 1.27, sparkline: [299, 301, 303, 304.8, 306.4] },
+  { symbol: 'IAU', name: 'iShares Gold Trust ETF', sector: 'Gold & Bullion ETFs', market: 'global', marketCapB: 42.4, price: '62.85', unit: 'USD', changePercent: 1.24, sparkline: [61.4, 61.8, 62.1, 62.5, 62.85] },
+  { symbol: 'PAXGUSDT', name: 'Spot Gold LBMA Bullion', sector: 'Gold & Bullion ETFs', market: 'global', marketCapB: 18.2, price: '3,284.5', unit: 'USD', changePercent: 1.18, sparkline: [3225, 3242, 3258, 3272, 3284.5] },
 
-  { symbol: 'JPM', name: 'JPMorgan Chase', sector: 'Financials', market: 'global', marketCapB: 685, price: '241.80', unit: 'USD', changePercent: 0.85, sparkline: [238, 239, 240, 241, 241.8] },
-  { symbol: 'V', name: 'Visa Inc.', sector: 'Financials', market: 'global', marketCapB: 590, price: '306.40', unit: 'USD', changePercent: -0.38, sparkline: [308, 307.5, 307, 306.8, 306.4] },
-  { symbol: 'GS', name: 'Goldman Sachs', sector: 'Financials', market: 'global', marketCapB: 185, price: '582.10', unit: 'USD', changePercent: 1.92, sparkline: [569, 573, 577, 580, 582.1] },
+  { symbol: 'AGG', name: 'iShares U.S. Aggregate Bond ETF', sector: 'Debt & Bond ETFs', market: 'global', marketCapB: 121, price: '98.75', unit: 'USD', changePercent: 0.28, sparkline: [97.9, 98.1, 98.35, 98.55, 98.75] },
+  { symbol: 'BND', name: 'Vanguard Total Bond Market ETF', sector: 'Debt & Bond ETFs', market: 'global', marketCapB: 124, price: '72.90', unit: 'USD', changePercent: 0.26, sparkline: [72.4, 72.52, 72.66, 72.78, 72.9] },
+  { symbol: 'TLT', name: 'iShares 20+ Year Treasury ETF', sector: 'Debt & Bond ETFs', market: 'global', marketCapB: 62.5, price: '91.40', unit: 'USD', changePercent: 0.64, sparkline: [89.8, 90.2, 90.6, 91.0, 91.4] },
 
-  { symbol: 'AMZN', name: 'Amazon.com', sector: 'Consumer', market: 'global', marketCapB: 2190, price: '209.60', unit: 'USD', changePercent: 0.48, sparkline: [208, 208.5, 209, 209.3, 209.6] },
-  { symbol: 'TSLA', name: 'Tesla, Inc.', sector: 'Consumer', market: 'global', marketCapB: 810, price: '254.80', unit: 'USD', changePercent: -1.24, sparkline: [259, 258, 257, 255.8, 254.8] },
-  { symbol: 'WMT', name: 'Walmart Inc.', sector: 'Consumer', market: 'global', marketCapB: 680, price: '84.90', unit: 'USD', changePercent: -0.22, sparkline: [85.2, 85.1, 85.0, 84.95, 84.9] },
+  { symbol: 'SGOV', name: 'iShares 0-3 Month Treasury ETF', sector: 'Treasury & Cash ETFs', market: 'global', marketCapB: 38.4, price: '100.42', unit: 'USD', changePercent: 0.04, sparkline: [100.34, 100.36, 100.38, 100.4, 100.42] },
+  { symbol: 'LQD', name: 'iShares Investment Grade Corp ETF', sector: 'Treasury & Cash ETFs', market: 'global', marketCapB: 32.8, price: '108.60', unit: 'USD', changePercent: 0.34, sparkline: [107.8, 108.0, 108.2, 108.4, 108.6] },
 
-  { symbol: 'XOM', name: 'Exxon Mobil', sector: 'Energy', market: 'global', marketCapB: 515, price: '116.40', unit: 'USD', changePercent: -1.65, sparkline: [119, 118.4, 117.6, 117, 116.4] },
-  { symbol: 'CVX', name: 'Chevron Corp.', sector: 'Energy', market: 'global', marketCapB: 278, price: '154.20', unit: 'USD', changePercent: -2.1, sparkline: [158, 157.1, 156, 155.1, 154.2] },
+  { symbol: 'SLV', name: 'iShares Silver Trust ETF', sector: 'Precious Metals ETFs', market: 'global', marketCapB: 15.6, price: '31.95', unit: 'USD', changePercent: 1.48, sparkline: [30.9, 31.2, 31.45, 31.7, 31.95] },
+  { symbol: 'PPLT', name: 'abrdn Physical Platinum ETF', sector: 'Precious Metals ETFs', market: 'global', marketCapB: 6.8, price: '94.20', unit: 'USD', changePercent: -0.68, sparkline: [95.4, 95.1, 94.8, 94.5, 94.2] },
 
-  { symbol: 'LLY', name: 'Eli Lilly & Co.', sector: 'Healthcare', market: 'global', marketCapB: 790, price: '832.10', unit: 'USD', changePercent: 2.34, sparkline: [810, 816, 822, 828, 832.1] },
-  { symbol: 'UNH', name: 'UnitedHealth Group', sector: 'Healthcare', market: 'global', marketCapB: 495, price: '538.40', unit: 'USD', changePercent: -0.84, sparkline: [544, 542, 540.5, 539.2, 538.4] },
-  { symbol: 'JNJ', name: 'Johnson & Johnson', sector: 'Healthcare', market: 'global', marketCapB: 382, price: '158.90', unit: 'USD', changePercent: 0.42, sparkline: [158, 158.2, 158.5, 158.7, 158.9] },
+  { symbol: 'VXUS', name: 'Vanguard Total Intl Stock ETF', sector: 'Global Allocation ETFs', market: 'global', marketCapB: 84.5, price: '64.30', unit: 'USD', changePercent: 0.52, sparkline: [63.5, 63.7, 63.9, 64.1, 64.3] },
+  { symbol: 'EFA', name: 'iShares MSCI EAFE ETF', sector: 'Global Allocation ETFs', market: 'global', marketCapB: 58.2, price: '82.10', unit: 'USD', changePercent: -0.24, sparkline: [82.5, 82.4, 82.3, 82.2, 82.1] },
+  { symbol: 'INDA', name: 'iShares MSCI India ETF', sector: 'Global Allocation ETFs', market: 'global', marketCapB: 11.4, price: '54.85', unit: 'USD', changePercent: 0.96, sparkline: [53.8, 54.1, 54.35, 54.6, 54.85] },
 
-  // India NSE Leaders
-  { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd.', sector: 'Financials', market: 'india', marketCapB: 162, price: '816.50', unit: 'INR', changePercent: 1.55, sparkline: [804, 807, 811, 814, 816.5] },
-  { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd.', sector: 'Financials', market: 'india', marketCapB: 134, price: '1,585.0', unit: 'INR', changePercent: 0.09, sparkline: [1581, 1582, 1583, 1584, 1585] },
-  { symbol: 'SBIN', name: 'State Bank of India', sector: 'Financials', market: 'india', marketCapB: 112, price: '1,090.5', unit: 'INR', changePercent: 0.97, sparkline: [1080, 1083, 1086, 1088, 1090.5] },
-  { symbol: 'AXISBANK', name: 'Axis Bank Ltd.', sector: 'Financials', market: 'india', marketCapB: 45, price: '1,182.0', unit: 'INR', changePercent: -0.68, sparkline: [1192, 1189, 1186, 1184, 1182] },
+  // India Mutual Funds, Gold BeES, Debt Funds & Index ETFs (AUM scaled in $B USD equiv.)
+  { symbol: 'PPFAS', name: 'Parag Parikh Flexi Cap Direct', sector: 'Flexi & Mid Cap Funds', market: 'india', marketCapB: 10.4, price: '89.42', unit: 'INR', changePercent: 0.88, sparkline: [87.4, 87.9, 88.4, 88.9, 89.42] },
+  { symbol: 'HDFCMID', name: 'HDFC Mid-Cap Opp. Direct', sector: 'Flexi & Mid Cap Funds', market: 'india', marketCapB: 9.1, price: '198.40', unit: 'INR', changePercent: 1.15, sparkline: [193.5, 194.8, 196.1, 197.3, 198.4] },
+  { symbol: 'QUANTSC', name: 'Quant Small Cap Direct Growth', sector: 'Flexi & Mid Cap Funds', market: 'india', marketCapB: 3.4, price: '264.15', unit: 'INR', changePercent: 1.42, sparkline: [257.2, 259.1, 260.8, 262.5, 264.15] },
+  { symbol: 'UTI50', name: 'UTI Nifty 50 Index Direct', sector: 'Flexi & Mid Cap Funds', market: 'india', marketCapB: 2.8, price: '174.88', unit: 'INR', changePercent: 0.96, sparkline: [172.1, 172.8, 173.5, 174.2, 174.88] },
 
-  { symbol: 'TCS', name: 'Tata Consultancy', sector: 'Technology', market: 'india', marketCapB: 175, price: '4,142.0', unit: 'INR', changePercent: -0.92, sparkline: [4185, 4172, 4160, 4150, 4142] },
-  { symbol: 'INFY', name: 'Infosys Ltd.', sector: 'Technology', market: 'india', marketCapB: 96, price: '1,145.1', unit: 'INR', changePercent: 0.32, sparkline: [1138, 1140, 1142, 1144, 1145.1] },
-  { symbol: 'HCLTECH', name: 'HCL Technologies', sector: 'Technology', market: 'india', marketCapB: 62, price: '1,864.5', unit: 'INR', changePercent: 1.28, sparkline: [1838, 1846, 1852, 1859, 1864.5] },
-  { symbol: 'KAYNES', name: 'Kaynes Technology', sector: 'Technology', market: 'india', marketCapB: 24, price: '2,980.0', unit: 'INR', changePercent: -3.45, sparkline: [3095, 3060, 3025, 3000, 2980] },
+  { symbol: 'NIFTYBEES', name: 'Nippon India ETF Nifty 50 BeES', sector: 'Nifty & Index ETFs', market: 'india', marketCapB: 4.2, price: '284.60', unit: 'INR', changePercent: 1.01, sparkline: [279.6, 281.0, 282.3, 283.5, 284.6] },
+  { symbol: 'BANKBEES', name: 'Nippon India ETF Bank BeES', sector: 'Nifty & Index ETFs', market: 'india', marketCapB: 1.6, price: '542.80', unit: 'INR', changePercent: 0.84, sparkline: [535.4, 537.5, 539.4, 541.2, 542.8] },
+  { symbol: 'JUNIORBEES', name: 'Nippon India ETF Next 50 BeES', sector: 'Nifty & Index ETFs', market: 'india', marketCapB: 0.9, price: '768.25', unit: 'INR', changePercent: 1.38, sparkline: [753.0, 757.2, 761.4, 765.0, 768.25] },
 
-  { symbol: 'RELIANCE', name: 'Reliance Industries', sector: 'Energy', market: 'india', marketCapB: 215, price: '1,298.4', unit: 'INR', changePercent: -1.14, sparkline: [1316, 1311, 1306, 1302, 1298.4] },
-  { symbol: 'ONGC', name: 'Oil & Natural Gas Corp', sector: 'Energy', market: 'india', marketCapB: 41, price: '254.60', unit: 'INR', changePercent: -2.05, sparkline: [261, 259, 257.5, 256, 254.6] },
+  { symbol: 'GOLDBEES', name: 'Nippon India ETF Gold BeES', sector: 'Gold BeES & SGBs', market: 'india', marketCapB: 1.78, price: '74.85', unit: 'INR', changePercent: 1.24, sparkline: [73.1, 73.5, 74.0, 74.4, 74.85] },
+  { symbol: 'SILVERBEES', name: 'Nippon India Silver ETF', sector: 'Gold BeES & SGBs', market: 'india', marketCapB: 0.65, price: '96.20', unit: 'INR', changePercent: 0.94, sparkline: [94.4, 94.9, 95.4, 95.8, 96.2] },
+  { symbol: 'SGBMAR31', name: 'Sovereign Gold Bond Tranche', sector: 'Gold BeES & SGBs', market: 'india', marketCapB: 1.15, price: '8,412.0', unit: 'INR', changePercent: 1.12, sparkline: [8260, 8300, 8340, 8378, 8412] },
 
-  { symbol: 'BHARTIARTL', name: 'Bharti Airtel Ltd.', sector: 'Telecom & Consumer', market: 'india', marketCapB: 146, price: '2,153.5', unit: 'INR', changePercent: 2.26, sparkline: [2105, 2118, 2130, 2142, 2153.5] },
-  { symbol: 'ITC', name: 'ITC Limited', sector: 'Telecom & Consumer', market: 'india', marketCapB: 72, price: '476.20', unit: 'INR', changePercent: 0.64, sparkline: [472, 473.5, 474.5, 475.2, 476.2] },
+  { symbol: 'HDFCCORP', name: 'HDFC Corporate Bond Direct', sector: 'Gilt & Debt Funds', market: 'india', marketCapB: 3.85, price: '33.48', unit: 'INR', changePercent: 0.24, sparkline: [33.26, 33.32, 33.38, 33.43, 33.48] },
+  { symbol: 'SBIGILT', name: 'SBI Magnum Gilt Fund Direct', sector: 'Gilt & Debt Funds', market: 'india', marketCapB: 1.32, price: '68.14', unit: 'INR', changePercent: 0.35, sparkline: [67.55, 67.7, 67.85, 68.0, 68.14] },
+  { symbol: 'ICICIGILT', name: 'ICICI Pru All Seasons Bond', sector: 'Gilt & Debt Funds', market: 'india', marketCapB: 1.68, price: '39.84', unit: 'INR', changePercent: 0.31, sparkline: [39.52, 39.6, 39.68, 39.76, 39.84] },
 
-  { symbol: 'LT', name: 'Larsen & Toubro', sector: 'Auto & Industrials', market: 'india', marketCapB: 68, price: '3,612.0', unit: 'INR', changePercent: 1.42, sparkline: [3555, 3570, 3588, 3600, 3612] },
-  { symbol: 'TATAMOTORS', name: 'Tata Motors Ltd.', sector: 'Auto & Industrials', market: 'india', marketCapB: 44, price: '894.50', unit: 'INR', changePercent: -1.35, sparkline: [908, 905, 901, 897, 894.5] },
-  { symbol: 'MARUTI', name: 'Maruti Suzuki', sector: 'Auto & Industrials', market: 'india', marketCapB: 52, price: '12,480', unit: 'INR', changePercent: 0.78, sparkline: [12380, 12405, 12430, 12455, 12480] },
+  { symbol: 'LIQUIDBEES', name: 'Nippon India Liquid BeES', sector: 'Liquid & Money Mkt', market: 'india', marketCapB: 1.45, price: '1,000.0', unit: 'INR', changePercent: 0.02, sparkline: [999.9, 999.95, 999.98, 1000.0, 1000.0] },
+  { symbol: 'PARAGLIQ', name: 'PPFAS Liquid Direct Growth', sector: 'Liquid & Money Mkt', market: 'india', marketCapB: 0.82, price: '1,442.6', unit: 'INR', changePercent: 0.03, sparkline: [1441.8, 1442.0, 1442.2, 1442.4, 1442.6] },
 
-  { symbol: 'SUNPHARMA', name: 'Sun Pharma', sector: 'Healthcare', market: 'india', marketCapB: 54, price: '1,812.0', unit: 'INR', changePercent: 1.85, sparkline: [1778, 1788, 1796, 1804, 1812] },
-  { symbol: 'DRREDDY', name: "Dr. Reddy's Labs", sector: 'Healthcare', market: 'india', marketCapB: 31, price: '1,377.9', unit: 'INR', changePercent: -0.15, sparkline: [1384, 1382, 1380, 1379, 1377.9] },
+  { symbol: 'BBOND36', name: 'Bharat Bond ETF 2036 AAA', sector: 'Banking & PSU Debt', market: 'india', marketCapB: 2.15, price: '1,218.4', unit: 'INR', changePercent: 0.29, sparkline: [1211, 1213, 1215, 1217, 1218.4] },
+  { symbol: 'AXISBPSU', name: 'Axis Banking & PSU Debt Direct', sector: 'Banking & PSU Debt', market: 'india', marketCapB: 1.72, price: '2,542.8', unit: 'INR', changePercent: 0.21, sparkline: [2532, 2535, 2538, 2540.5, 2542.8] },
 ];
+
+/**
+ * Computes annualized realized volatility (%) from an equity's rolling price series
+ * blended with its intraday return magnitude so low-beta and high-beta leaders separate cleanly.
+ */
+export function calculateRealizedVolatility(
+  sparkline: number[],
+  changePercent = 0
+): number {
+  const returns: number[] = [];
+  for (let i = 1; i < sparkline.length; i++) {
+    const prev = sparkline[i - 1];
+    const curr = sparkline[i];
+    if (prev > 0 && Number.isFinite(curr)) {
+      returns.push((curr - prev) / prev);
+    }
+  }
+
+  let stdDev = 0;
+  if (returns.length >= 2) {
+    const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
+    const variance =
+      returns.reduce((s, r) => s + (r - mean) * (r - mean), 0) / (returns.length - 1);
+    stdDev = Math.sqrt(variance);
+  } else if (returns.length === 1) {
+    stdDev = Math.abs(returns[0]) * 0.5;
+  }
+
+  // Annualize step standard deviation (252 trading days) and incorporate active session swing
+  const annualized = stdDev * Math.sqrt(252) * 100;
+  const sessionMomentumVol = Math.abs(changePercent) * 9.5 + 8.0;
+  const combined = annualized * 0.65 + sessionMomentumVol * 0.55;
+
+  return Number(Math.max(8.5, Math.min(72.0, combined)).toFixed(1));
+}
+
+/**
+ * Maps annualized volatility (%) to a high-contrast institutional heat palette.
+ */
+export function getVolatilityTileStyle(volatilityPct: number): HeatmapVolatilityColors {
+  if (volatilityPct >= 38) {
+    return { bg: '#991B1B', text: '#FFFFFF', subText: '#FECACA', tier: 'Extreme' };
+  }
+  if (volatilityPct >= 28) {
+    return { bg: '#DC2626', text: '#FFFFFF', subText: '#FEE2E2', tier: 'Elevated' };
+  }
+  if (volatilityPct >= 19) {
+    return { bg: '#D97706', text: '#FFFFFF', subText: '#FEF3C7', tier: 'Moderate' };
+  }
+  return { bg: '#0F766E', text: '#FFFFFF', subText: '#CCFBF1', tier: 'Calm' };
+}
 
 /**
  * Maps daily percentage return to accessible color-coded green/neutral/red tile palette.
@@ -145,8 +194,58 @@ export function getHeatmapTileStyle(changePercent: number): HeatmapTileColors {
   return { bg: '#B91C1C', text: '#FFFFFF', subText: '#FECACA', tier: 'Sharp Loss' };
 }
 
+function parseFormattedPrice(raw: string): number {
+  const num = Number(raw.replace(/,/g, ''));
+  return Number.isFinite(num) && num > 0 ? num : 100;
+}
+
+function formatPricePreserveStyle(value: number, template: string): string {
+  const hasComma = template.includes(',');
+  const decimalsMatch = template.match(/\.(\d+)/);
+  const decimals = decimalsMatch ? decimalsMatch[1].length : 2;
+  if (hasComma) {
+    return value.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  }
+  return value.toFixed(decimals);
+}
+
 /**
- * Groups heatmap tiles by sector with market-cap weighted sorting and breadth counters.
+ * Applies a deterministic real-time micro-tick update across all heatmap equities,
+ * keeping rolling sparkline history bounded and updating daily return & volatility live.
+ */
+export function applyHeatmapTick(
+  tiles: HeatmapStockTile[],
+  tickStep: number
+): HeatmapStockTile[] {
+  return tiles.map((tile, idx) => {
+    const baseNumeric = parseFormattedPrice(tile.price);
+    const currentVol = calculateRealizedVolatility(tile.sparkline, tile.changePercent);
+    // Higher-volatility names experience proportionally wider intraday micro-ticks
+    const volScale = 0.0006 + (currentVol / 100) * 0.0022;
+    const phase = tickStep * 1.37 + idx * 2.19;
+    const wave = Math.sin(phase) * 0.68 + Math.cos(phase * 0.53) * 0.32;
+    const pctStep = wave * volScale;
+
+    const nextPrice = Math.max(0.5, baseNumeric * (1 + pctStep));
+    const nextChangePct = Number(
+      Math.max(-9.5, Math.min(9.5, tile.changePercent + pctStep * 100)).toFixed(2)
+    );
+    const nextSparkline = [...tile.sparkline.slice(-15), Number(nextPrice.toFixed(2))];
+
+    return {
+      ...tile,
+      price: formatPricePreserveStyle(nextPrice, tile.price),
+      changePercent: nextChangePct,
+      sparkline: nextSparkline,
+    };
+  });
+}
+
+/**
+ * Groups heatmap tiles by sector with market-cap weighted return, realized volatility, and return dispersion.
  */
 export function buildSectorGroups(
   tiles: HeatmapStockTile[],
@@ -173,6 +272,19 @@ export function buildSectorGroups(
     const weightedSum = sortedItems.reduce((sum, t) => sum + t.changePercent * t.marketCapB, 0);
     const avgChangePercent =
       totalCapB > 0 ? Number((weightedSum / totalCapB).toFixed(2)) : 0;
+
+    const weightedVol = sortedItems.reduce(
+      (sum, t) => sum + calculateRealizedVolatility(t.sparkline, t.changePercent) * t.marketCapB,
+      0
+    );
+    const volatilityPct =
+      totalCapB > 0 ? Number((weightedVol / totalCapB).toFixed(1)) : 0;
+
+    const pctList = sortedItems.map((t) => t.changePercent);
+    const dispersionPct =
+      pctList.length > 1
+        ? Number((Math.max(...pctList) - Math.min(...pctList)).toFixed(2))
+        : 0;
 
     groups.push({
       sector,
