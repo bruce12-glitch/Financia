@@ -340,8 +340,12 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
                         <div className="text-sm font-semibold text-[#131722]">
                           {asset.price} <span className="text-[10px] text-[#787B86]">{asset.unit}</span>
                         </div>
-                        <div className="text-xs font-medium text-[#F23645]">
-                          {formatSignedPercent(coin.changePercent)}
+                        <div
+                          className={`text-xs font-medium ${
+                            asset.changePercent >= 0 ? 'text-[#089981]' : 'text-[#F23645]'
+                          }`}
+                        >
+                          {formatSignedPercent(asset.changePercent)}
                         </div>
                       </div>
                     </button>
@@ -351,10 +355,10 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
 
               <button
                 type="button"
-                onClick={() => onSelectSymbol(CRYPTO_ASSETS[1])}
+                onClick={() => onSelectSymbol(GOLD_BULLION_ASSETS[1])}
                 className="mt-4 text-xs font-semibold text-[#2962FF] hover:underline inline-flex items-center gap-0.5 cursor-pointer self-start"
               >
-                <span>See all crypto coins</span>
+                <span>Inspect Gold Bullion</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -407,43 +411,52 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
             ))}
           </div>
 
-          {/* 2-Column Futures Quick Card + India Annual Inflation Rate Bar Card (PDF Page 4) */}
+          {/* 2-Column Debt Funds & Sovereign Yield Desk + India Annual Inflation Rate */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="rounded-2xl border border-[#E0E3EB] bg-white p-5 space-y-3">
-              {[
-                { symbol: 'CL1!', name: 'Light crude oil', price: '87.42 USD / barrel', chg: -1.29, badge: 'CL', color: '#111827' },
-                { symbol: 'NG1!', name: 'Natural gas', price: '3.159 USD / MMBTU', chg: -2.20, badge: 'NG', color: '#0EA5E9' },
-                { symbol: 'GC1!', name: 'Gold', price: '3,867.6 USD / oz', chg: -0.48, badge: 'Au', color: '#D97706' },
-                { symbol: 'HG1!', name: 'Copper', price: '6.0455 USD / lb', chg: -0.74, badge: 'Cu', color: '#B45309' },
-              ].map((fut) => (
-                <div key={fut.symbol} className="flex items-center justify-between py-1">
-                  <div className="flex items-center gap-3">
+              <div className="text-sm font-bold text-[#131722] mb-1">
+                Debt Funds &amp; Sovereign Yield Desk
+              </div>
+              {DEBT_FUND_LEADERS.slice(0, 4).map((debt) => (
+                <button
+                  key={debt.symbol}
+                  type="button"
+                  onClick={() => onSelectSymbol(debt)}
+                  className="w-full flex items-center justify-between py-1 px-2 -mx-2 rounded-lg hover:bg-[#F8F9FD] transition-colors text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
                     <span
-                      className="w-9 h-9 rounded-full text-white text-xs font-bold flex items-center justify-center"
-                      style={{ backgroundColor: fut.color }}
+                      className="w-9 h-9 rounded-full text-white text-[11px] font-bold flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: debt.badgeColor }}
                     >
-                      {fut.badge}
+                      {debt.badgeText}
                     </span>
-                    <div>
-                      <div className="text-sm font-semibold text-[#131722]">{fut.name}</div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-[#131722] truncate">{debt.name}</div>
                       <span className="text-[11px] font-mono bg-[#F0F3FA] text-[#787B86] px-1.5 py-0.5 rounded">
-                        {fut.symbol}
+                        {debt.symbol}
                       </span>
                     </div>
                   </div>
-                  <div className="text-right tabular-nums">
-                    <div className="text-sm font-semibold text-[#131722]">{fut.price}</div>
-                    <div className="text-xs font-medium text-[#F23645]">
-                      {formatSignedPercent(fut.chg)}
+                  <div className="text-right tabular-nums shrink-0">
+                    <div className="text-sm font-semibold text-[#131722]">
+                      {debt.price} <span className="text-[10px] text-[#787B86] font-normal">{debt.unit}</span>
+                    </div>
+                    <div
+                      className={`text-xs font-medium ${
+                        debt.changePercent >= 0 ? 'text-[#089981]' : 'text-[#F23645]'
+                      }`}
+                    >
+                      {formatSignedPercent(debt.changePercent)}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
               <a
-                href="#futures-section"
+                href="#debt-funds-section"
                 className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#2962FF] hover:underline pt-1"
               >
-                <span>See all futures</span>
+                <span>Explore all debt funds</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </a>
             </div>
@@ -508,44 +521,44 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
             </div>
           </div>
 
-          {/* Interactive Sector & Stock Performance Heatmap */}
-          <SectorHeatmap onSelectSymbol={onSelectSymbol} />
+          {/* Real-Time D3.js Sector Performance Volatility Heatmap */}
+          <SectorHeatmap onSelectSymbol={onSelectSymbol} liveFeedActive={liveFeedActive} />
         </section>
 
-        {/* 2. Featured IPOs Row (PDF Page 4) */}
-        <section aria-label="Featured IPOs">
+        {/* 2. Featured NFOs & SGB Tranches Row */}
+        <section aria-label="Featured NFOs and SGB Tranches">
           <h2 className="text-2xl font-display font-bold text-[#131722] mb-4 inline-flex items-center gap-1">
-            <span>Featured IPOs</span>
+            <span>Featured NFOs &amp; SGB Tranches</span>
             <ChevronRight className="w-5 h-5" />
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {FEATURED_IPOS.map((ipo) => (
+            {FEATURED_NFO_AND_SGB.map((item) => (
               <div
-                key={ipo.symbol}
+                key={item.symbol}
                 className="rounded-xl border border-[#E0E3EB] bg-white p-4 flex flex-col justify-between gap-4 hover:border-[#2962FF]/40 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <span
                     className="w-9 h-9 rounded-full text-white text-xs font-bold flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: ipo.accentColor }}
+                    style={{ backgroundColor: item.accentColor }}
                   >
-                    {ipo.symbol.slice(0, 2)}
+                    {item.symbol.slice(0, 2)}
                   </span>
                   <div>
-                    <div className="text-xs font-bold text-[#131722]">{ipo.symbol}</div>
-                    <div className="text-xs text-[#787B86]">{ipo.name}</div>
+                    <div className="text-xs font-bold text-[#131722]">{item.symbol}</div>
+                    <div className="text-xs text-[#787B86]">{item.name}</div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#F0F3FA] tabular-nums">
                   <div>
-                    <div className="text-[#787B86]">Exchange</div>
-                    <div className="font-semibold text-[#131722]">{ipo.exchange}</div>
+                    <div className="text-[#787B86]">Issuer / Venue</div>
+                    <div className="font-semibold text-[#131722]">{item.exchange}</div>
                   </div>
                   <div>
-                    <div className="text-[#787B86]">Latest valuation</div>
-                    <div className="font-semibold text-[#131722]">{ipo.valuation}</div>
+                    <div className="text-[#787B86]">Coupon / Target YTM</div>
+                    <div className="font-semibold text-[#131722]">{item.valuation}</div>
                   </div>
                 </div>
               </div>
