@@ -290,6 +290,8 @@ export function buildSectorGroups(
       sector,
       totalCapB,
       avgChangePercent,
+      volatilityPct,
+      dispersionPct,
       advancers: sortedItems.filter((t) => t.changePercent > 0).length,
       decliners: sortedItems.filter((t) => t.changePercent < 0).length,
       tiles: sortedItems,
@@ -297,6 +299,91 @@ export function buildSectorGroups(
   }
 
   return groups.sort((a, b) => b.totalCapB - a.totalCapB);
+}
+
+interface HierarchyNodeData {
+  name: string;
+  group?: HeatmapSectorGroup;
+  tile?: HeatmapStockTile;
+  value?: number;
+  children?: HierarchyNodeData[];
+}
+
+/**
+ * Computes a D3.js squarified treemap layout over sector groups and cap-weighted stock tiles.
+ */
+export function computeD3TreemapLayout(
+  groups: HeatmapSectorGroup[],
+  width: number,
+  height: number
+): D3TreemapLayoutResult {
+  if (!groups || groups.length === 0 || width <= 0 || height <= 0) {
+    return { sectors: [], tiles: [], maxVolatilityPct: 0 };
+  }
+
+  const rootData: HierarchyNodeData = {
+    name: 'market-root',
+    children: groups.map((group) => ({
+      name: group.sector,
+      group,
+      children: group.tiles.map((tile) => ({
+        name: tile.symbol,
+        tile,
+        value: Math.max(10, tile.marketCapB),
+      })),
+    })),
+  };
+
+  const hierarchyRoot = d3
+    .hierarchy<HierarchyNodeData>(rootData)
+    .sum((d) => d.value || 0)
+    .sort((a, b) => (b.value || 0) - (a.value || 0));
+
+  d3
+    .treemap<HierarchyNodeData>()
+    .tile(d3.treemapSquarify)
+    .size([width, height])
+    .paddingOuter(4)
+    .paddingTop(24)
+    .paddingInner(3)
+    .round(true)(hierarchyRoot);
+
+  const treemapRoot = hierarchyRoot as d3.HierarchyRectangularNode<HierarchyNodeData>;
+
+  const sectors: D3TreemapSectorRect[] = (treemapRoot.children || [])
+    .filter((node) => node.data.group)
+    .map((node) => {
+      const grp = node.data.group!;
+      return {
+        sector: grp.sector,
+        x0: node.x0,
+        y0: node.y0,
+        x1: node.x1,
+        y1: node.y1,
+        avgChangePercent: grp.avgChangePercent,
+        volatilityPct: grp.volatilityPct,
+        dispersionPct: grp.dispersionPct,
+        totalCapB: grp.totalCapB,
+      };
+    });
+
+  const leaves = treemapRoot.leaves().filter((leaf) => Boolean(leaf.data.tile));
+  const tiles: D3TreemapTileRect[] = leaves.map((leaf) => {
+    const tile = leaf.data.tile!;
+    return {
+      tile,
+      volatilityPct: calculateRealizedVolatility(tile.sparkline, tile.changePercent),
+      x0: leaf.x0,
+      y0: leaf.y0,
+      x1: leaf.x1,
+      y1: leaf.y1,
+    };
+  });
+
+  const maxVolatilityPct =
+    tiles.length > 0 ? Math.max(...tiles.map((t) => t.volatilityPct)) : 0;
+
+  return { sectors, tiles, maxVolatilityPct };
 }
 
 /**
@@ -326,16 +413,26 @@ export function getHeatmapTileSpan(index: number, totalCount: number): string {
  * Converts a HeatmapStockTile to MarketSymbolRow for seamless modal quote inspection.
  */
 export function heatmapTileToMarketSymbolRow(tile: HeatmapStockTile): MarketSymbolRow {
+  const lowerSec = tile.sector.toLowerCase();
+  const category: MarketSymbolRow['category'] = lowerSec.includes('gold') || lowerSec.includes('metal')
+    ? 'gold'
+    : lowerSec.includes('gilt') || lowerSec.includes('debt') || lowerSec.includes('bond') || lowerSec.includes('liquid') || lowerSec.includes('treasury')
+    ? 'debt_funds'
+    : lowerSec.includes('etf')
+    ? 'etfs'
+    : 'mutual_funds';
+
   return {
     symbol: tile.symbol,
     name: tile.name,
-    exchange: tile.market === 'india' ? 'NSE' : 'NASDAQ',
+    exchange: tile.market === 'india' ? 'AMFI / NSE' : 'NYSEARCA',
     price: tile.price,
     unit: tile.unit,
     changePercent: tile.changePercent,
     badgeText: tile.symbol.slice(0, 3),
     badgeColor: tile.changePercent >= 0 ? '#089981' : '#F23645',
-    category: tile.market === 'india' ? 'indian_stocks' : 'indices',
+    category,
     sparkline: tile.sparkline,
   };
 }
+
