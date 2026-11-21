@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.playwright-cli/
+.aistudio/
+backend/data/
+amfi_nav_dev.db
+amfi_nav_dev.db-wal
+amfi_nav_dev.db-shm
