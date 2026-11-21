@@ -40,6 +40,7 @@ import { TerminalPortfolioAllocator } from './TerminalPortfolioAllocator';
 import { TerminalBulkDataPanel } from './TerminalBulkDataPanel';
 import { TerminalIndividualAnalysisPanel } from './TerminalIndividualAnalysisPanel';
 import { TerminalCrossFundComparePanel } from './TerminalCrossFundComparePanel';
+import { TerminalCorrelationMatrix90d } from './TerminalCorrelationMatrix90d';
 import { SCREENER_FUNDS } from '../utils/screenerEngine';
 import { getFundIntelligence, selectPeerComparisonSymbols } from '../utils/fundIntelligenceEngine';
 
@@ -653,6 +654,23 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
             >
               <List className="w-3.5 h-3.5 text-[#2563eb]" />
               <span>{showWatchlistDrawer ? 'Hide Live Watchlist' : `Live Watchlist (${stocks.length})`}</span>
+            </button>
+
+            <button
+              type="button"
+              data-testid="jump-correlation-matrix-90d"
+              onClick={() => {
+                setTerminalTab('compare');
+                window.setTimeout(() => {
+                  document
+                    .getElementById('correlation-matrix-90d')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 60);
+              }}
+              className="h-8 px-3 rounded-[8px] border border-[#bfdbfe] bg-[#eff6ff] hover:bg-[#dbeafe] text-xs font-semibold text-[#1d4ed8] inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>90D Correlation Matrix</span>
             </button>
           </div>
 
@@ -1296,6 +1314,16 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
           </div>
         </div>
 
+            {/* 90-Day Recharts Statistical Correlation Matrix for Selected Comparison Tickers */}
+            <div className="mt-6">
+              <TerminalCorrelationMatrix90d
+                primarySymbol={activeStock.ticker}
+                comparisonTickers={comparisonTickers || []}
+                stocks={stocks}
+                onChangeComparisonTickers={onComparisonTickersChange}
+              />
+            </div>
+
             {/* Quick Workspace Jump Strip from Chart View to Compare & Risk Tabs */}
             <div className="mt-6 rounded-[12px] bg-white border border-[#e2e8f0] p-4 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -1343,16 +1371,25 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
           />
         )}
 
-        {/* SECTION 2: COMPARE ANY TWO FUNDS (SECTOR & TYPE INDEPENDENT) + MULTI-FUND STUDIO */}
+        {/* SECTION 2: COMPARE ANY TWO FUNDS (SECTOR & TYPE INDEPENDENT) + 90D CORRELATION MATRIX */}
         {terminalTab === 'compare' && (
-          <TerminalCrossFundComparePanel
-            primarySymbol={activeStock.ticker}
-            comparisonTickers={comparisonTickers || []}
-            analysisMode={analysisMode}
-            onSwitchAnalysisMode={setAnalysisMode}
-            onSelectPrimary={(sym) => onAnalyzeCustomTicker(sym, agentMode)}
-            onChangeComparisonTickers={(next) => onComparisonTickersChange?.(next)}
-          />
+          <div className="space-y-6">
+            <TerminalCrossFundComparePanel
+              primarySymbol={activeStock.ticker}
+              comparisonTickers={comparisonTickers || []}
+              analysisMode={analysisMode}
+              onSwitchAnalysisMode={setAnalysisMode}
+              onSelectPrimary={(sym) => onAnalyzeCustomTicker(sym, agentMode)}
+              onChangeComparisonTickers={(next) => onComparisonTickersChange?.(next)}
+            />
+
+            <TerminalCorrelationMatrix90d
+              primarySymbol={activeStock.ticker}
+              comparisonTickers={comparisonTickers || []}
+              stocks={stocks}
+              onChangeComparisonTickers={onComparisonTickersChange}
+            />
+          </div>
         )}
 
         {/* TAB 3: CUSTOM % PORTFOLIO ALLOCATOR & HISTORICAL RETURN PROJECTION */}
