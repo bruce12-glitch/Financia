@@ -1,0 +1,439 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-display: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  --font-editorial: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  --font-sans: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  --font-mono: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+
+  /* Obsidian & Alabaster Institutional Reserve Palette */
+  --color-obsidian-950: #040711;
+  --color-obsidian-900: #070d1c;
+  --color-obsidian-800: #0e172a;
+  --color-obsidian-700: #16223b;
+
+  --color-primary: #2563eb;
+  --color-primary-deep: #1d4ed8;
+  --color-primary-press: #1e40af;
+  --color-primary-soft: #38bdf8;
+  --color-primary-subdued: #bfdbfe;
+
+  --color-ink: #090e1a;
+  --color-ink-secondary: #334155;
+  --color-ink-mute: #64748b;
+  --color-ink-mute-2: #475569;
+
+  --color-canvas: #ffffff;
+  --color-canvas-soft: #f8fafc;
+  --color-hairline: #e2e8f0;
+  --color-hairline-input: #cbd5e1;
+
+  --color-jade: #059669;
+  --color-jade-bright: #34d399;
+  --color-crimson: #dc2626;
+  --color-crimson-bright: #fb7185;
+  --color-bullion: #b45309;
+  --color-bullion-bright: #f59e0b;
+}
+
+@layer base {
+  :root {
+    --font-display: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+    --font-editorial: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+    --font-sans: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+    --font-mono: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01";
+    scroll-behavior: smooth;
+    background-color: #ffffff;
+    color: #090e1a;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-weight: 300;
+    font-feature-settings: "ss01";
+    background-color: #ffffff;
+    color: #090e1a;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    font-feature-settings: "ss01";
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* Sculpted High-Density Institutional Display Scale (sohne-var / SF Pro Display) */
+.type-display-xxl {
+  font-family: var(--font-display);
+  font-size: clamp(2.45rem, 1.45rem + 3.2vw, 4.125rem); /* 39px -> 66px */
+  font-weight: 600;
+  line-height: 1.03;
+  letter-spacing: -0.038em;
+  text-wrap: balance;
+}
+
+.type-display-xl {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 1.2rem + 1.85vw, 2.65rem); /* 28px -> 42px */
+  font-weight: 600;
+  line-height: 1.09;
+  letter-spacing: -0.032em;
+  text-wrap: balance;
+}
+
+.type-display-lg {
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 1.1rem + 1.2vw, 2rem);
+  font-weight: 600;
+  line-height: 1.14;
+  letter-spacing: -0.024em;
+}
+
+.type-display-md {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+}
+
+.type-heading-lg {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.24;
+  letter-spacing: -0.018em;
+}
+
+.type-heading-md {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.38;
+  letter-spacing: -0.012em;
+}
+
+.tabular-nums,
+.type-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Requested Hero Typography Scale (Strictly Font Properties — Zero Color Overrides) */
+.hero-font-root {
+  --font-hero: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-hero);
+}
+
+.hero-display-xxl {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: clamp(2.4rem, 4.2vw, 56px);
+  font-weight: 300;
+  line-height: 1.03;
+  letter-spacing: -1.4px;
+  font-feature-settings: "ss01";
+}
+
+.hero-display-xl {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 48px;
+  font-weight: 300;
+  line-height: 1.15;
+  letter-spacing: -0.96px;
+  font-feature-settings: "ss01";
+}
+
+.hero-display-lg {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 32px;
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: -0.64px;
+  font-feature-settings: "ss01";
+}
+
+.hero-display-md {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 26px;
+  font-weight: 300;
+  line-height: 1.12;
+  letter-spacing: -0.26px;
+  font-feature-settings: "ss01";
+}
+
+.hero-heading-lg {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 22px;
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: -0.22px;
+  font-feature-settings: "ss01";
+}
+
+.hero-heading-md {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: -0.2px;
+  font-feature-settings: "ss01";
+}
+
+.hero-heading-sm {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: 0;
+  font-feature-settings: "ss01";
+}
+
+.hero-body-lg {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: 0;
+  font-feature-settings: "ss01";
+}
+
+.hero-body-md {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: 0;
+  font-feature-settings: "ss01";
+}
+
+.hero-body-tabular {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: -0.42px;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-button-md {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  font-feature-settings: "ss01";
+}
+
+.hero-button-sm {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  font-feature-settings: "ss01";
+}
+
+.hero-caption {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: -0.39px;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-micro {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: 0;
+  font-feature-settings: "ss01";
+}
+
+.hero-micro-cap {
+  font-family: sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: 0.1px;
+  font-feature-settings: "ss01";
+}
+
+/* Precision Single-Elevation Architectural Shadows */
+.shadow-level-1 {
+  box-shadow: 0 1px 2px rgba(9, 14, 26, 0.05), 0 4px 12px rgba(9, 14, 26, 0.03);
+}
+
+.shadow-level-2 {
+  box-shadow: 0 12px 32px rgba(4, 7, 17, 0.12), 0 2px 6px rgba(4, 7, 17, 0.06);
+}
+
+/* Obsidian Surface Sheen & Subtle Hairline Architecture */
+.obsidian-panel {
+  background: linear-gradient(180deg, rgba(14, 23, 42, 0.94) 0%, rgba(7, 13, 28, 0.98) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 20px 50px rgba(2, 6, 18, 0.55);
+}
+
+.obsidian-grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(148, 163, 184, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.055) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Action Button Tokens (Crisp 200ms Settling Curve) */
+.btn-primary-pill {
+  background-color: #090e1a;
+  color: #ffffff;
+  font-weight: 500;
+  line-height: 1;
+  border-radius: 9999px;
+  padding: 12px 22px;
+  transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-primary-pill:hover {
+  background-color: #1e293b;
+}
+.btn-primary-pill:active {
+  background-color: #040711;
+}
+
+.btn-cobalt-pill {
+  background-color: #2563eb;
+  color: #ffffff;
+  font-weight: 500;
+  line-height: 1;
+  border-radius: 9999px;
+  padding: 12px 22px;
+  transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-cobalt-pill:hover {
+  background-color: #1d4ed8;
+}
+.btn-cobalt-pill:active {
+  background-color: #1e40af;
+}
+
+.btn-secondary-pill {
+  background-color: #ffffff;
+  color: #090e1a;
+  border: 1px solid #cbd5e1;
+  font-weight: 500;
+  line-height: 1;
+  border-radius: 9999px;
+  padding: 12px 22px;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.btn-secondary-pill:hover {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.btn-on-dark-pill {
+  background-color: #ffffff;
+  color: #040711;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 9999px;
+  padding: 12px 24px;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+.btn-on-dark-pill:hover {
+  background-color: #e2e8f0;
+}
+
+.text-input-stripe {
+  background-color: #ffffff;
+  color: #090e1a;
+  font-size: 14px;
+  font-weight: 400;
+  border-radius: 8px;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.text-input-stripe:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+/* Custom Sleek Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+@keyframes financia-ticker-marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-financia-marquee {
+  animation: financia-ticker-marquee 46s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-financia-marquee {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes financia-meadow-breathe {
+  0%,
+  100% {
+    transform: scale(1.02) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.045) translate3d(-0.6%, -0.4%, 0);
+  }
+}
+
+.animate-meadow-breathe {
+  animation: financia-meadow-breathe 16s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-meadow-breathe {
+    animation: none;
+    transform: scale(1.0);
+  }
+}
