@@ -13,6 +13,11 @@ import {
   synthesizeCustomTickerReport,
   validateTickerInput,
 } from '../../frontend/utils/stockEngine.ts';
+import { SCREENER_FUNDS } from '../../frontend/utils/screenerEngine.ts';
+import {
+  buildTerminalSuggestions,
+  TerminalSuggestionFilter,
+} from '../../frontend/utils/terminalSearchEngine.ts';
 import { isGeminiConfigured } from '../services/geminiService.ts';
 import {
   enrichStockQuote,
@@ -242,7 +247,7 @@ export function createStocksRouter(navDbOverride?: NavDatabaseService | null): R
   });
 
   const handleAnalyze = async (req: Request, res: Response) => {
-    const rawTicker = String(req.query.ticker || 'GOLDBEES').trim().toUpperCase();
+    const rawTicker = String(req.query.ticker || 'QQQ').trim().toUpperCase();
     const check = validateTickerInput(rawTicker);
     if (!check.valid) {
       res.status(400).json({ error: check.error || 'Invalid symbol format.' });
@@ -250,14 +255,57 @@ export function createStocksRouter(navDbOverride?: NavDatabaseService | null): R
     }
 
     const { stock, source } = await enrichStockQuote(check.normalized);
+    const db = resolveNavDb();
+    let navDbDetail = null;
+    let navDbHistory = null;
+    if (db && db.isConnected()) {
+      const detail = db.getSchemeDetail(check.normalized);
+      if (detail) {
+        navDbDetail = detail;
+        navDbHistory = db.getSchemeHistory(check.normalized, { page: 1, pageSize: 60 });
+      }
+    }
+
     res.json({
       source,
       stock,
+      navDbDetail,
+      navDbHistory,
     });
   };
 
   router.get('/funds/analyze', handleAnalyze);
   router.get('/stocks/analyze', handleAnalyze);
+
+  // Unified Fund Terminal database autocomplete suggestions (Core 20 ETFs/MFs + SQLite nav_master schemes)
+  router.get('/terminal/suggest', (req, res) => {
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    const rawFilter = typeof req.query.filter === 'string' ? req.query.filter : 'ALL';
+    const validFilters = new Set<TerminalSuggestionFilter>(['ALL', 'ETF', 'Mutual Fund', 'SQLITE_DB']);
+    const filter: TerminalSuggestionFilter = validFilters.has(rawFilter as TerminalSuggestionFilter)
+      ? (rawFilter as TerminalSuggestionFilter)
+      : 'ALL';
+    const limit = Math.min(60, Math.max(1, Number(req.query.limit || 24) || 24));
+
+    const db = resolveNavDb();
+    const navDbSchemes = db && db.isConnected() ? db.listSchemes(100, 0) : [];
+    const suggestions = buildTerminalSuggestions({
+      query,
+      catalogFunds: SCREENER_FUNDS,
+      navDbSchemes,
+      filter,
+      limit,
+    });
+
+    res.json({
+      source: db && db.isConnected() ? 'catalog+sqlite-nav-master' : 'catalog-only',
+      query,
+      filter,
+      totalCatalog: SCREENER_FUNDS.length,
+      totalNavDb: navDbSchemes.length,
+      suggestions,
+    });
+  });
 
   const handleTechnicals = async (req: Request, res: Response) => {
     const check = validateTickerInput(String(req.params.ticker || 'GOLDBEES'));

@@ -26,6 +26,10 @@ import {
   ArrowLeft,
   Layers,
   Table2,
+  Bookmark,
+  Database,
+  Plus,
+  X,
 } from 'lucide-react';
 import { StockQuote, TimelineEvent } from '../types/financia';
 import { PriceAlert } from '../utils/alertEngine';
@@ -41,8 +45,17 @@ import { TerminalBulkDataPanel } from './TerminalBulkDataPanel';
 import { TerminalIndividualAnalysisPanel } from './TerminalIndividualAnalysisPanel';
 import { TerminalCrossFundComparePanel } from './TerminalCrossFundComparePanel';
 import { TerminalCorrelationMatrix90d } from './TerminalCorrelationMatrix90d';
-import { SCREENER_FUNDS } from '../utils/screenerEngine';
+import { SCREENER_FUNDS, ScreenerFundRecord } from '../utils/screenerEngine';
 import { getFundIntelligence, selectPeerComparisonSymbols } from '../utils/fundIntelligenceEngine';
+import { synthesizeScreenerFundFromQuote } from '../utils/rebalanceEngine';
+import {
+  buildScreenerFundFromNavDbDetail,
+  buildTerminalSuggestions,
+  NavDbSchemeDetail,
+  NavDbSchemeSummary,
+  TerminalSuggestionFilter,
+  TerminalSuggestionItem,
+} from '../utils/terminalSearchEngine';
 
 export type TerminalTabId = 'individual' | 'compare' | 'allocator' | 'bulk' | 'chart' | 'risk';
 
@@ -94,6 +107,93 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
   const [terminalTab, setTerminalTab] = useState<TerminalTabId>(initialTab);
   const [showWatchlistDrawer, setShowWatchlistDrawer] = useState<boolean>(false);
 
+  // Live Database Autocomplete & SQLite nav_master Hydration State
+  const [navDbSchemes, setNavDbSchemes] = useState<NavDbSchemeSummary[]>([]);
+  const [hydratedFundsBySymbol, setHydratedFundsBySymbol] = useState<
+    Record<string, ScreenerFundRecord>
+  >({});
+  const [suggestionsOpen, setSuggestionsOpen] = useState<boolean>(false);
+  const [suggestionFilter, setSuggestionFilter] = useState<TerminalSuggestionFilter>('ALL');
+  const [highlightedSuggestionIdx, setHighlightedSuggestionIdx] = useState<number>(0);
+  const searchBoxRef = useRef<HTMLDivElement | null>(null);
+
+  // Research Pinboard (Quick-Switch & 1-Click Multi-Compare)
+  const [pinnedSymbols, setPinnedSymbols] = useState<string[]>(() => {
+    try {
+      const raw = window.localStorage.getItem('financia_terminal_pins_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.slice(0, 6).map((s) => String(s).toUpperCase());
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return ['QQQ', 'PPFAS', 'VTI', '1'];
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('financia_terminal_pins_v1', JSON.stringify(pinnedSymbols));
+    } catch {
+      // ignore storage errors
+    }
+  }, [pinnedSymbols]);
+
+  // Preload all SQLite nav_master schemes on mount so search suggestions are instant
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/nav-master/schemes?limit=100')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { schemes?: NavDbSchemeSummary[] } | null) => {
+        if (!cancelled && data && Array.isArray(data.schemes)) {
+          setNavDbSchemes(data.schemes);
+        }
+      })
+      .catch(() => {
+        // Offline graceful fallback to Core Catalog
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Dismiss autocomplete suggestions dropdown when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setSuggestionsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const searchSuggestions: TerminalSuggestionItem[] = useMemo(
+    () =>
+      buildTerminalSuggestions({
+        query: tickerInput,
+        catalogFunds: SCREENER_FUNDS,
+        navDbSchemes,
+        filter: suggestionFilter,
+        limit: 16,
+      }),
+    [tickerInput, navDbSchemes, suggestionFilter]
+  );
+
+  useEffect(() => {
+    setHighlightedSuggestionIdx(0);
+  }, [tickerInput, suggestionFilter]);
+
+  const handleTogglePin = (symbol: string) => {
+    const up = symbol.trim().toUpperCase();
+    if (!up) return;
+    setPinnedSymbols((prev) =>
+      prev.includes(up) ? prev.filter((s) => s !== up) : [up, ...prev].slice(0, 6)
+    );
+  };
+
   useEffect(() => {
     setTerminalTab(initialTab);
   }, [initialTab, tabRequestNonce]);
@@ -140,6 +240,44 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
   const activeStock = useMemo(() => {
     return stocks.find((s) => s.ticker === selectedTicker) || stocks[0];
   }, [stocks, selectedTicker]);
+
+  // Hydrate full ScreenerFundRecord from SQLite nav_master whenever activeStock matches a DB scheme
+  useEffect(() => {
+    const sym = activeStock.ticker.trim().toUpperCase();
+    if (!sym) return;
+    if (SCREENER_FUNDS.some((f) => f.symbol.toUpperCase() === sym)) return;
+    if (hydratedFundsBySymbol[sym]) return;
+
+    let cancelled = false;
+    Promise.all([
+      fetch(`/api/nav-master/fund/${encodeURIComponent(sym)}`).then((r) =>
+        r.ok ? r.json() : null
+      ),
+      fetch(`/api/nav-master/nav/${encodeURIComponent(sym)}?page=1&page_size=60`).then((r) =>
+        r.ok ? r.json() : null
+      ),
+    ])
+      .then(
+        ([fundRes, navRes]: [
+          { payload?: NavDbSchemeDetail } | null,
+          { payload?: { data?: Array<{ nav_date: string; nav: number; day_change_pct: number | null }> } } | null,
+        ]) => {
+          if (cancelled || !fundRes?.payload) return;
+          const record = buildScreenerFundFromNavDbDetail(
+            fundRes.payload,
+            navRes?.payload?.data
+          );
+          setHydratedFundsBySymbol((prev) => ({ ...prev, [sym]: record }));
+        }
+      )
+      .catch(() => {
+        // Non-SQLite custom symbol falls back cleanly to synthesizeScreenerFundFromQuote
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeStock.ticker, hydratedFundsBySymbol]);
 
   const displayedStocks = useMemo(() => {
     const matchesClass = (s: StockQuote) => {
@@ -304,17 +442,47 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
     }, 450);
   };
 
+  const handleSelectSuggestion = (item: TerminalSuggestionItem, mode: 'analyze' | 'compare') => {
+    setSuggestionsOpen(false);
+    setInputError(null);
+    setTickerInput('');
+    if (mode === 'compare') {
+      if (onComparisonTickersChange && item.symbol.toUpperCase() !== activeStock.ticker.toUpperCase()) {
+        const current = comparisonTickers || [];
+        const nextPeers = current.includes(item.symbol)
+          ? current
+          : [item.symbol, ...current.filter((t) => t !== item.symbol)].slice(0, 3);
+        onComparisonTickersChange(nextPeers);
+      }
+      if (item.source === 'sqlite-nav-db') {
+        void onAnalyzeCustomTicker(item.symbol, agentMode);
+      }
+      setAnalysisMode('multi');
+      setTerminalTab('compare');
+      return;
+    }
+    triggerAgentAnalysisRun(item.symbol, agentMode);
+    setTerminalTab('individual');
+  };
+
   const handleAnalyzeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const validation = validateTickerInput(tickerInput);
     if (!validation.valid) {
+      // If user typed a partial name like "Altiva" or "Parag", pick top DB suggestion automatically
+      if (searchSuggestions.length > 0 && tickerInput.trim().length >= 2) {
+        handleSelectSuggestion(searchSuggestions[0], 'analyze');
+        return;
+      }
       setInputError(validation.error || 'Invalid ticker symbol.');
       return;
     }
     setInputError(null);
+    setSuggestionsOpen(false);
     const normalized = validation.normalized;
     setTickerInput('');
     triggerAgentAnalysisRun(normalized, agentMode);
+    setTerminalTab('individual');
   };
 
   const handleToggleAudioBriefing = () => {
@@ -389,7 +557,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
               <span>Back to Workspace Overview</span>
             </button>
             <div className="text-[11px] font-mono text-[#64748b]">
-              Dedicated Fund Terminal · All {SCREENER_FUNDS.length} Mutual Funds &amp; ETFs
+              Dedicated Fund Terminal · {SCREENER_FUNDS.length} Core ETFs/MFs + {navDbSchemes.length} SQLite nav_master Schemes
             </div>
           </div>
         )}
@@ -457,44 +625,248 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
           </div>
         </div>
 
-        {/* Ticker Search & Fund Lookup Bar */}
-        <form onSubmit={handleAnalyzeSubmit} className="mb-7" noValidate>
-          <div className="glass-card-light flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-[12px] border border-[#e3e8ee] focus-within:border-[#2563eb] transition-colors">
-            <div className="flex items-center gap-3 pl-3 py-1.5 flex-1">
-              <Search className="w-5 h-5 text-[#2563eb] shrink-0" />
-              <label htmlFor="financia-ticker-input" className="sr-only">
-                Mutual Fund, Gold, Debt Fund, ETF, or AMFI Scheme Code
-              </label>
-              <input
-                id="financia-ticker-input"
-                type="text"
-                value={tickerInput}
-                onChange={(e) => {
-                  setTickerInput(e.target.value);
-                  if (inputError) setInputError(null);
-                }}
-                placeholder="Search Mutual Fund, Gold, Debt Fund, ETF, or AMFI code (e.g., PPFAS, 125497, GOLDBEES, SBIGILT)..."
-                className="w-full bg-transparent text-[#131722] font-mono text-sm uppercase placeholder:normal-case placeholder:font-sans placeholder:text-[#6B7280] focus:outline-none"
-              />
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {timelineEvents.length > 0 && (
+        {/* Ticker Search & Live Database Suggestions Bar */}
+        <form onSubmit={handleAnalyzeSubmit} className="mb-6" noValidate>
+          <div ref={searchBoxRef} className="relative">
+            <div className="glass-card-light flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-[12px] border border-[#e3e8ee] focus-within:border-[#2563eb] transition-colors">
+              <div className="flex items-center gap-3 pl-3 py-1.5 flex-1 min-w-0">
+                <Search className="w-5 h-5 text-[#2563eb] shrink-0" />
+                <label htmlFor="financia-ticker-input" className="sr-only">
+                  Search ETF, Mutual Fund, ISIN, or SQLite nav_master Scheme Code
+                </label>
+                <input
+                  id="financia-ticker-input"
+                  type="text"
+                  autoComplete="off"
+                  role="combobox"
+                  aria-expanded={suggestionsOpen}
+                  aria-controls="terminal-db-suggestions"
+                  aria-autocomplete="list"
+                  value={tickerInput}
+                  onFocus={() => setSuggestionsOpen(true)}
+                  onChange={(e) => {
+                    setTickerInput(e.target.value);
+                    setSuggestionsOpen(true);
+                    if (inputError) setInputError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setSuggestionsOpen(false);
+                      return;
+                    }
+                    if (!suggestionsOpen) return;
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setHighlightedSuggestionIdx((prev) =>
+                        searchSuggestions.length > 0 ? (prev + 1) % searchSuggestions.length : 0
+                      );
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setHighlightedSuggestionIdx((prev) =>
+                        searchSuggestions.length > 0
+                          ? (prev - 1 + searchSuggestions.length) % searchSuggestions.length
+                          : 0
+                      );
+                    } else if (e.key === 'Enter' && searchSuggestions[highlightedSuggestionIdx]) {
+                      e.preventDefault();
+                      handleSelectSuggestion(searchSuggestions[highlightedSuggestionIdx], 'analyze');
+                    }
+                  }}
+                  placeholder={`Search ${SCREENER_FUNDS.length + navDbSchemes.length} database ETFs, MFs & SQLite schemes (e.g., QQQ, PPFAS, VTI, qsif, Altiva, Magnum, ISIN)...`}
+                  className="w-full bg-transparent text-[#131722] font-mono text-sm placeholder:normal-case placeholder:font-sans placeholder:text-[#6B7280] focus:outline-none"
+                />
+                {tickerInput && (
+                  <button
+                    type="button"
+                    aria-label="Clear search query"
+                    onClick={() => setTickerInput('')}
+                    className="p-1 rounded text-[#64748b] hover:text-[#0f172a] cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setShowTimelineModal((prev) => !prev)}
-                  className="px-3.5 py-2.5 rounded-lg bg-[#F4F5F7] text-[#131722] hover:bg-[#E5E7EB] text-xs font-mono border border-[#E5E7EB] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  data-testid="toggle-db-suggestions-btn"
+                  onClick={() => setSuggestionsOpen((p) => !p)}
+                  className="px-3 py-2.5 rounded-lg bg-[#eff6ff] text-[#1d4ed8] hover:bg-[#dbeafe] text-xs font-mono font-semibold border border-[#bfdbfe] transition-colors whitespace-nowrap shrink-0 cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  {showTimelineModal ? 'Hide Audit Log' : `Audit Log (${timelineEvents.length})`}
+                  <Database className="w-3.5 h-3.5" />
+                  <span>DB Directory ({SCREENER_FUNDS.length + navDbSchemes.length})</span>
                 </button>
-              )}
-              <button
-                type="submit"
-                disabled={isAnalyzing}
-                className="px-6 py-2.5 rounded-lg bg-[#131722] text-white hover:bg-[#1F2937] disabled:opacity-50 font-semibold text-sm transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                {isAnalyzing ? 'Loading Data...' : 'Analyze Asset'}
-              </button>
+                {timelineEvents.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTimelineModal((prev) => !prev)}
+                    className="px-3.5 py-2.5 rounded-lg bg-[#F4F5F7] text-[#131722] hover:bg-[#E5E7EB] text-xs font-mono border border-[#E5E7EB] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    {showTimelineModal ? 'Hide Audit Log' : `Audit Log (${timelineEvents.length})`}
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={isAnalyzing}
+                  className="px-5 py-2.5 rounded-lg bg-[#131722] text-white hover:bg-[#1F2937] disabled:opacity-50 font-semibold text-sm transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  {isAnalyzing ? 'Loading Data...' : 'Analyze Asset'}
+                </button>
+              </div>
             </div>
+
+            {/* Live Database Autocomplete Suggestions Dropdown */}
+            {suggestionsOpen && (
+              <div
+                id="terminal-db-suggestions"
+                data-testid="terminal-db-suggestions"
+                role="listbox"
+                className="absolute left-0 right-0 top-full mt-2 z-40 rounded-[14px] bg-white border border-[#cbd5e1] shadow-2xl overflow-hidden"
+              >
+                {/* Dropdown Header & Database Filter Pills */}
+                <div className="px-4 py-2.5 bg-[#f8fafc] border-b border-[#e2e8f0] flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(
+                      [
+                        {
+                          id: 'ALL' as const,
+                          label: `All Database (${SCREENER_FUNDS.length + navDbSchemes.length})`,
+                        },
+                        {
+                          id: 'ETF' as const,
+                          label: `ETFs (${SCREENER_FUNDS.filter((f) => f.instrumentType === 'ETF').length})`,
+                        },
+                        {
+                          id: 'Mutual Fund' as const,
+                          label: `Mutual Funds (${SCREENER_FUNDS.filter((f) => f.instrumentType === 'Mutual Fund').length + navDbSchemes.length})`,
+                        },
+                        {
+                          id: 'SQLITE_DB' as const,
+                          label: `SQLite nav_master (${navDbSchemes.length})`,
+                        },
+                      ] as const
+                    ).map((pill) => (
+                      <button
+                        key={pill.id}
+                        type="button"
+                        data-testid={`suggestion-filter-${pill.id.toLowerCase().replace(/\s+/g, '-')}`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setSuggestionFilter(pill.id)}
+                        className={`px-2.5 py-1 rounded-[6px] text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                          suggestionFilter === pill.id
+                            ? 'bg-[#0f172a] text-white'
+                            : 'bg-white border border-[#e2e8f0] text-[#475569] hover:border-[#2563eb] hover:text-[#0f172a]'
+                        }`}
+                      >
+                        {pill.label}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-[10.5px] font-mono text-[#64748b]">
+                    Showing {searchSuggestions.length} matches · ↑↓ Navigate · Enter Analyze
+                  </span>
+                </div>
+
+                {/* Suggestion Rows */}
+                {searchSuggestions.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-[#64748b]">
+                    No exact match in local catalog for &ldquo;{tickerInput}&rdquo; — press{' '}
+                    <strong className="text-[#0f172a]">Analyze Asset</strong> to query live AMFI / market feeds and generate a full 16-module dossier.
+                  </div>
+                ) : (
+                  <div className="max-h-[340px] overflow-y-auto divide-y divide-[#f1f5f9]">
+                    {searchSuggestions.map((item, idx) => {
+                      const isHighlighted = idx === highlightedSuggestionIdx;
+                      const prefix = item.currency === 'INR' ? '₹' : '$';
+                      return (
+                        <div
+                          key={item.id}
+                          role="option"
+                          aria-selected={isHighlighted}
+                          data-testid={`terminal-suggestion-row-${item.symbol}`}
+                          onMouseEnter={() => setHighlightedSuggestionIdx(idx)}
+                          className={`px-4 py-2.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 transition-colors ${
+                            isHighlighted ? 'bg-[#eff6ff]' : 'hover:bg-[#f8fafc]'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleSelectSuggestion(item, 'analyze')}
+                            className="flex-1 min-w-0 text-left cursor-pointer"
+                          >
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-mono font-bold text-xs text-[#0f172a] px-1.5 py-0.5 rounded bg-[#f1f5f9] border border-[#e2e8f0]">
+                                {item.source === 'sqlite-nav-db' ? `#${item.symbol}` : item.symbol}
+                              </span>
+                              <span className="text-xs font-semibold text-[#0f172a] truncate max-w-[360px]">
+                                {item.name}
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${
+                                  item.source === 'sqlite-nav-db'
+                                    ? 'bg-[#ecfdf5] text-[#047857]'
+                                    : item.instrumentType === 'ETF'
+                                      ? 'bg-[#eff6ff] text-[#1d4ed8]'
+                                      : 'bg-[#f5f3ff] text-[#6d28d9]'
+                                }`}
+                              >
+                                {item.source === 'sqlite-nav-db'
+                                  ? 'SQLite nav_master'
+                                  : item.instrumentType}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-[#64748b] mt-0.5 flex flex-wrap items-center gap-2 font-mono">
+                              <span>{item.category}</span>
+                              <span>· {item.exchange}</span>
+                              {item.isin && <span>· ISIN {item.isin}</span>}
+                              {item.observationCount && <span>· {item.observationCount} NAVs</span>}
+                            </div>
+                          </button>
+
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <div className="text-right font-mono tabular-nums">
+                              <div className="text-xs font-bold text-[#0f172a]">
+                                {prefix}
+                                {item.price.toFixed(2)}
+                              </div>
+                              {item.changePct !== null && (
+                                <div
+                                  className={`text-[10.5px] font-semibold ${
+                                    item.changePct >= 0 ? 'text-[#059669]' : 'text-[#dc2626]'
+                                  }`}
+                                >
+                                  {item.changePct >= 0 ? '+' : ''}
+                                  {item.changePct.toFixed(2)}%
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => handleSelectSuggestion(item, 'analyze')}
+                              className="h-7 px-2.5 rounded-[6px] bg-[#0f172a] hover:bg-[#1e293b] text-white text-[11px] font-semibold cursor-pointer whitespace-nowrap"
+                            >
+                              Analyze
+                            </button>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => handleSelectSuggestion(item, 'compare')}
+                              className="h-7 px-2 rounded-[6px] bg-white hover:bg-[#eff6ff] border border-[#cbd5e1] hover:border-[#2563eb] text-[#334155] hover:text-[#1d4ed8] text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Compare</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {inputError && (
@@ -507,26 +879,91 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
             </div>
           )}
 
-          {/* Quick-Try Live Scheme Shortcuts across diverse categories */}
-          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-[#6B7280]">
-            <span>Quick lookup:</span>
-            {[
-              { symbol: 'QUANTSC', note: 'Small Cap MF' },
-              { symbol: 'BANKBEES', note: 'Bank Nifty ETF' },
-              { symbol: 'HDFCCORP', note: 'AAA Corporate Debt' },
-              { symbol: 'SILVERBEES', note: 'Silver Bullion ETF' },
-              { symbol: 'VTI', note: 'US Total Market' },
-              { symbol: '125497', note: 'AMFI Live NAV' },
-            ].map((item) => (
-              <button
-                key={item.symbol}
-                type="button"
-                onClick={() => triggerAgentAnalysisRun(item.symbol, agentMode)}
-                className="px-2.5 py-1 rounded-md bg-[#F9FAFB] hover:bg-[#F3F4F6] border border-[#E5E7EB] text-[#131722] font-mono transition-colors cursor-pointer"
-              >
-                {item.symbol} <span className="text-[#2563eb]">· {item.note}</span>
-              </button>
-            ))}
+          {/* Research Pinboard & Quick Lookup Strip */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <div className="flex flex-wrap items-center gap-1.5 text-[#6B7280]">
+              <span className="inline-flex items-center gap-1 font-semibold text-[#334155]">
+                <Bookmark className="w-3.5 h-3.5 text-[#2563eb]" />
+                <span>Pinned:</span>
+              </span>
+              {pinnedSymbols.map((sym) => {
+                const isActivePin = sym === activeStock.ticker.toUpperCase();
+                return (
+                  <span
+                    key={sym}
+                    data-testid={`pinned-chip-${sym}`}
+                    className={`inline-flex items-center rounded-md border font-mono overflow-hidden ${
+                      isActivePin
+                        ? 'bg-[#0f172a] text-white border-[#0f172a]'
+                        : 'bg-white text-[#0f172a] border-[#cbd5e1]'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerAgentAnalysisRun(sym, agentMode);
+                        setTerminalTab('individual');
+                      }}
+                      className="px-2 py-1 hover:opacity-80 cursor-pointer font-semibold"
+                    >
+                      {/^\d+$/.test(sym) ? `DB #${sym}` : sym}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Unpin ${sym}`}
+                      onClick={() => handleTogglePin(sym)}
+                      className={`px-1 py-1 border-l cursor-pointer ${
+                        isActivePin
+                          ? 'border-white/20 text-white/75 hover:text-white'
+                          : 'border-[#e2e8f0] text-[#94a3b8] hover:text-[#dc2626]'
+                      }`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                );
+              })}
+
+              {pinnedSymbols.length >= 2 && (
+                <button
+                  type="button"
+                  data-testid="compare-pinned-btn"
+                  onClick={() => {
+                    onAnalyzeCustomTicker(pinnedSymbols[0], agentMode);
+                    onComparisonTickersChange?.(pinnedSymbols.slice(1, 4));
+                    setAnalysisMode('multi');
+                    setTerminalTab('compare');
+                  }}
+                  className="px-2.5 py-1 rounded-md bg-[#eff6ff] hover:bg-[#dbeafe] border border-[#bfdbfe] text-[#1d4ed8] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <GitCompare className="w-3 h-3" />
+                  <span>Compare Pinned</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 text-[#6B7280]">
+              <span>Try SQLite DB:</span>
+              {[
+                { symbol: '1', note: 'qsif Long-Short' },
+                { symbol: '9', note: 'Altiva Hybrid' },
+                { symbol: '14', note: 'Magnum Hybrid' },
+                { symbol: '27', note: 'Titanium SIF' },
+              ].map((item) => (
+                <button
+                  key={item.symbol}
+                  type="button"
+                  data-testid={`quick-sqlite-${item.symbol}`}
+                  onClick={() => {
+                    triggerAgentAnalysisRun(item.symbol, agentMode);
+                    setTerminalTab('individual');
+                  }}
+                  className="px-2 py-1 rounded-md bg-[#ecfdf5] hover:bg-[#d1fae5] border border-[#a7f3d0] text-[#047857] font-mono transition-colors cursor-pointer"
+                >
+                  #{item.symbol} <span className="text-[#065f46]">· {item.note}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </form>
 
@@ -682,7 +1119,8 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
               id="terminal-all-20-select"
               data-testid="terminal-instrument-select"
               value={
-                SCREENER_FUNDS.some((f) => f.symbol === activeStock.ticker)
+                SCREENER_FUNDS.some((f) => f.symbol === activeStock.ticker) ||
+                navDbSchemes.some((s) => String(s.scheme_code) === activeStock.ticker)
                   ? activeStock.ticker
                   : ''
               }
@@ -690,16 +1128,30 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                 if (!e.target.value) return;
                 onAnalyzeCustomTicker(e.target.value, agentMode);
               }}
-              className="h-9 rounded-[8px] border border-[#cbd5e1] bg-[#f8fafc] px-3 text-xs font-semibold text-[#0f172a] focus:outline-none focus:border-[#2563eb] cursor-pointer max-w-[290px]"
+              className="h-9 rounded-[8px] border border-[#cbd5e1] bg-[#f8fafc] px-3 text-xs font-semibold text-[#0f172a] focus:outline-none focus:border-[#2563eb] cursor-pointer max-w-[310px]"
             >
-              {!SCREENER_FUNDS.some((f) => f.symbol === activeStock.ticker) && (
-                <option value="">{activeStock.ticker} — {activeStock.name}</option>
+              {!SCREENER_FUNDS.some((f) => f.symbol === activeStock.ticker) &&
+                !navDbSchemes.some((s) => String(s.scheme_code) === activeStock.ticker) && (
+                  <option value="">
+                    {activeStock.ticker} — {activeStock.name}
+                  </option>
+                )}
+              <optgroup label={`Core ETFs & Mutual Funds (${SCREENER_FUNDS.length})`}>
+                {SCREENER_FUNDS.map((f) => (
+                  <option key={f.symbol} value={f.symbol}>
+                    {f.symbol} — {f.name} ({f.instrumentType === 'Mutual Fund' ? 'MF' : 'ETF'})
+                  </option>
+                ))}
+              </optgroup>
+              {navDbSchemes.length > 0 && (
+                <optgroup label={`SQLite nav_master Database (${navDbSchemes.length})`}>
+                  {navDbSchemes.map((s) => (
+                    <option key={`db-${s.scheme_code}`} value={String(s.scheme_code)}>
+                      #{s.scheme_code} — {s.scheme_name} (₹{s.latest_nav.toFixed(2)})
+                    </option>
+                  ))}
+                </optgroup>
               )}
-              {SCREENER_FUNDS.map((f) => (
-                <option key={f.symbol} value={f.symbol}>
-                  {f.symbol} — {f.name} ({f.instrumentType === 'Mutual Fund' ? 'MF' : 'ETF'})
-                </option>
-              ))}
             </select>
           </div>
         </div>
@@ -717,7 +1169,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                 id: 'individual',
                 label: 'Individual Analysis',
                 icon: PieChart,
-                badge: '13 Modules',
+                badge: '16 Modules',
               },
               {
                 id: 'compare',
@@ -735,7 +1187,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                 id: 'bulk',
                 label: 'Bulk Data View',
                 icon: Table2,
-                badge: `${SCREENER_FUNDS.length}`,
+                badge: `${SCREENER_FUNDS.length + navDbSchemes.length}`,
               },
               {
                 id: 'chart',
@@ -1359,10 +1811,14 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
           </>
         )}
 
-        {/* SECTION 1: INDIVIDUAL INSTRUMENT ANALYSIS (ALL 13 MODULES FOR EVERY FUND/ETF) */}
+        {/* SECTION 1: INDIVIDUAL INSTRUMENT ANALYSIS (ALL 16 MODULES FOR EVERY FUND/ETF/SQLITE DB SCHEME) */}
         {terminalTab === 'individual' && (
           <TerminalIndividualAnalysisPanel
             activeStock={activeStock}
+            hydratedFund={hydratedFundsBySymbol[activeStock.ticker.toUpperCase()] || null}
+            navDbSchemes={navDbSchemes}
+            isPinned={pinnedSymbols.includes(activeStock.ticker.toUpperCase())}
+            onTogglePin={handleTogglePin}
             onSelectInstrument={(sym) => onAnalyzeCustomTicker(sym, agentMode)}
             onCompareWithFund={(symA) => {
               onAnalyzeCustomTicker(symA, agentMode);
@@ -1377,6 +1833,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
             <TerminalCrossFundComparePanel
               primarySymbol={activeStock.ticker}
               comparisonTickers={comparisonTickers || []}
+              extraFunds={Object.values(hydratedFundsBySymbol)}
               analysisMode={analysisMode}
               onSwitchAnalysisMode={setAnalysisMode}
               onSelectPrimary={(sym) => onAnalyzeCustomTicker(sym, agentMode)}
@@ -1527,9 +1984,11 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
             {/* Top Holdings Breakdown for Active Screener Instrument */}
             {(() => {
               const matchedFund =
+                hydratedFundsBySymbol[activeStock.ticker.toUpperCase()] ||
                 SCREENER_FUNDS.find(
                   (f) => f.symbol.toUpperCase() === activeStock.ticker.toUpperCase()
-                ) || SCREENER_FUNDS[0];
+                ) ||
+                synthesizeScreenerFundFromQuote(activeStock);
               const intel = getFundIntelligence(matchedFund);
               return (
                 <div className="rounded-[12px] bg-white border border-[#e2e8f0] p-6">

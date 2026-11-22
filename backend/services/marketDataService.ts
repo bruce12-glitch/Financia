@@ -163,6 +163,9 @@ import {
   parseTwelveDataTimeSeries,
 } from '../../frontend/utils/liveDataParsers.ts';
 import { calculateRSI, synthesizeCustomTickerReport } from '../../frontend/utils/stockEngine.ts';
+import { buildScreenerFundFromNavDbDetail } from '../../frontend/utils/terminalSearchEngine.ts';
+import { buildTerminalQuoteFromScreenerFund } from '../../frontend/utils/fundIntelligenceEngine.ts';
+import { getNavDatabase } from './navDatabaseService.ts';
 
 export const AMFI_SCHEME_MAP: Record<string, string> = {
   PPFAS: '122639',
@@ -896,6 +899,39 @@ export async function enrichStockQuote(
 
   let stock = synthesizeCustomTickerReport(ticker, INITIAL_STOCKS);
   let sourceLabel = 'financia-4pillar-engine';
+
+  // 0. Live Local SQLite nav_master Database Lookup (25+ SEBI SIF / AMFI schemes by scheme_code or ISIN)
+  const navDb = getNavDatabase();
+  if (navDb && navDb.isConnected()) {
+    const dbDetail = navDb.getSchemeDetail(ticker);
+    if (dbDetail) {
+      const dbHistory = navDb.getSchemeHistory(ticker, { page: 1, pageSize: 45 });
+      const historyPoints = dbHistory?.data ? [...dbHistory.data].reverse() : [];
+      const fundRecord = buildScreenerFundFromNavDbDetail(dbDetail, historyPoints);
+      const quoteFromDb = buildTerminalQuoteFromScreenerFund(fundRecord);
+      if (historyPoints.length >= 2) {
+        const realChartPoints = historyPoints.map((pt, idx) => {
+          const prevNav = idx > 0 ? historyPoints[idx - 1].nav : pt.nav;
+          return {
+            date: pt.nav_date,
+            price: Number(pt.nav.toFixed(4)),
+            open: Number(prevNav.toFixed(4)),
+            high: Number(Math.max(pt.nav, prevNav).toFixed(4)),
+            low: Number(Math.min(pt.nav, prevNav).toFixed(4)),
+            volume: Math.max(100, Math.round(dbDetail.observation_count * 120)),
+          };
+        });
+        quoteFromDb.report.financial_charts.stock_price_4m = realChartPoints;
+        quoteFromDb.rsi14 = calculateRSI(realChartPoints.map((p) => p.price));
+      }
+      quoteFromDb.dataSource = 'SQLite nav_master (SEBI SIF / AMFI)';
+      quoteFromDb.amfiSchemeCode = String(dbDetail.scheme_code);
+      stock = quoteFromDb;
+      sourceLabel = 'sqlite-nav-master';
+      enrichedQuoteCache.set(ticker, { fetchedAt: now, stock, source: sourceLabel });
+      return { stock, source: sourceLabel };
+    }
+  }
 
   // 1. Live Zero-Key AMFI Mutual Fund / Debt Fund NAV + Analytics Feed
   // Supports ISIN codes (INF...), scheme_code numbers (125497), or aliases (PPFAS, SBIGILT)

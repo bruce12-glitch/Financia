@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -29,6 +29,7 @@ import { TerminalComparisonWorkbench } from './TerminalComparisonWorkbench';
 export interface TerminalCrossFundComparePanelProps {
   primarySymbol: string;
   comparisonTickers: string[];
+  extraFunds?: ScreenerFundRecord[];
   analysisMode: 'single' | 'multi';
   onSwitchAnalysisMode: (mode: 'single' | 'multi') => void;
   onSelectPrimary: (symbol: string) => void;
@@ -47,6 +48,7 @@ export const TerminalCrossFundComparePanel: React.FC<
 > = ({
   primarySymbol,
   comparisonTickers,
+  extraFunds = [],
   analysisMode,
   onSwitchAnalysisMode,
   onSelectPrimary,
@@ -54,32 +56,51 @@ export const TerminalCrossFundComparePanel: React.FC<
 }) => {
   const [subMode, setSubMode] = useState<'two-fund' | 'multi-studio'>('two-fund');
 
+  const allCompareFunds = useMemo(() => {
+    const seen = new Set(SCREENER_FUNDS.map((f) => f.symbol.toUpperCase()));
+    const extras = extraFunds.filter((f) => !seen.has(f.symbol.toUpperCase()));
+    return [...extras, ...SCREENER_FUNDS];
+  }, [extraFunds]);
+
   const resolvedInitialA = useMemo(() => {
-    return SCREENER_FUNDS.some((f) => f.symbol === primarySymbol)
+    return allCompareFunds.some((f) => f.symbol.toUpperCase() === primarySymbol.toUpperCase())
       ? primarySymbol
       : 'PPFAS';
-  }, [primarySymbol]);
+  }, [primarySymbol, allCompareFunds]);
 
   const resolvedInitialB = useMemo(() => {
     const firstPeer = comparisonTickers.find(
-      (sym) => sym !== resolvedInitialA && SCREENER_FUNDS.some((f) => f.symbol === sym)
+      (sym) =>
+        sym.toUpperCase() !== resolvedInitialA.toUpperCase() &&
+        allCompareFunds.some((f) => f.symbol.toUpperCase() === sym.toUpperCase())
     );
     if (firstPeer) return firstPeer;
     return resolvedInitialA === 'QQQ' ? 'PPFAS' : 'QQQ';
-  }, [comparisonTickers, resolvedInitialA]);
+  }, [comparisonTickers, resolvedInitialA, allCompareFunds]);
 
   const [symbolA, setSymbolA] = useState<string>(resolvedInitialA);
   const [symbolB, setSymbolB] = useState<string>(resolvedInitialB);
   const [horizonYears, setHorizonYears] = useState<number>(5);
   const [baseInvestment, setBaseInvestment] = useState<number>(100_000);
 
+  useEffect(() => {
+    if (allCompareFunds.some((f) => f.symbol.toUpperCase() === primarySymbol.toUpperCase())) {
+      setSymbolA(primarySymbol);
+    }
+  }, [primarySymbol, allCompareFunds]);
+
   const fundA: ScreenerFundRecord = useMemo(
-    () => SCREENER_FUNDS.find((f) => f.symbol === symbolA) || SCREENER_FUNDS[0],
-    [symbolA]
+    () =>
+      allCompareFunds.find((f) => f.symbol.toUpperCase() === symbolA.toUpperCase()) ||
+      allCompareFunds[0],
+    [symbolA, allCompareFunds]
   );
   const fundB: ScreenerFundRecord = useMemo(
-    () => SCREENER_FUNDS.find((f) => f.symbol === symbolB) || SCREENER_FUNDS[1],
-    [symbolB]
+    () =>
+      allCompareFunds.find((f) => f.symbol.toUpperCase() === symbolB.toUpperCase()) ||
+      allCompareFunds[1] ||
+      allCompareFunds[0],
+    [symbolB, allCompareFunds]
   );
 
   const comparison = useMemo(
@@ -202,7 +223,7 @@ export const TerminalCrossFundComparePanel: React.FC<
                   }}
                   className="w-full h-9 rounded-[8px] border border-[#93c5fd] bg-white px-3 text-xs font-semibold text-[#0f172a] focus:outline-none focus:border-[#2563eb] cursor-pointer"
                 >
-                  {SCREENER_FUNDS.map((f) => (
+                  {allCompareFunds.map((f) => (
                     <option key={f.symbol} value={f.symbol}>
                       {f.symbol} — {f.name} ({f.instrumentType === 'Mutual Fund' ? 'MF' : 'ETF'} · {f.category})
                     </option>
@@ -250,7 +271,7 @@ export const TerminalCrossFundComparePanel: React.FC<
                   }}
                   className="w-full h-9 rounded-[8px] border border-[#6ee7b7] bg-white px-3 text-xs font-semibold text-[#0f172a] focus:outline-none focus:border-[#059669] cursor-pointer"
                 >
-                  {SCREENER_FUNDS.map((f) => (
+                  {allCompareFunds.map((f) => (
                     <option key={f.symbol} value={f.symbol}>
                       {f.symbol} — {f.name} ({f.instrumentType === 'Mutual Fund' ? 'MF' : 'ETF'} · {f.category})
                     </option>

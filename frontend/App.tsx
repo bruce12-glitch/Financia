@@ -139,7 +139,7 @@ export default function App() {
     loadAlertAudioPreferences()
   );
   const [comparisonTickers, setComparisonTickers] = useState<string[]>(() =>
-    selectPeerComparisonSymbols('GOLDBEES', SCREENER_FUNDS, 2)
+    selectPeerComparisonSymbols('QQQ', SCREENER_FUNDS, 2)
   );
   const [alertTarget, setAlertTarget] = useState<AlertTargetAsset | null>(null);
   const [triggeredBanner, setTriggeredBanner] = useState<{
@@ -282,7 +282,7 @@ export default function App() {
     }, 60);
   }, []);
 
-  const enterTerminal = useCallback((initialTab: TerminalTabId = 'compare') => {
+  const enterTerminal = useCallback((initialTab: TerminalTabId = 'individual') => {
     setActiveView('terminal');
     setTerminalTabRequest((prev) => ({ tab: initialTab, nonce: prev.nonce + 1 }));
     if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/terminal')) {
@@ -314,7 +314,7 @@ export default function App() {
       const target = pendingSectionRef.current;
       pendingSectionRef.current = null;
       if (target === 'live-terminal') {
-        enterTerminal('compare');
+        enterTerminal('individual');
       } else {
         enterFrontend(target);
       }
@@ -355,7 +355,7 @@ export default function App() {
           setSignupOpen(true);
           return;
         }
-        enterTerminal('compare');
+        enterTerminal('individual');
         return;
       }
 
@@ -569,7 +569,7 @@ export default function App() {
   );
 
   const handleOpenInTerminal = useCallback(
-    (ticker: string, customPeers?: string[], initialTab: TerminalTabId = 'compare') => {
+    (ticker: string, customPeers?: string[], initialTab: TerminalTabId = 'individual') => {
       const normalized = ticker.trim().toUpperCase();
       if (!normalized) return;
       void handleAnalyzeCustomTicker(normalized, 'perseus');
@@ -737,7 +737,7 @@ export default function App() {
             alertAudioEnabled={alertAudioPrefs.masterEnabled}
             onToggleRegion={handleToggleRegion}
             onJumpToSection={handleJumpToSection}
-            onOpenTerminal={() => enterTerminal('compare')}
+            onOpenTerminal={() => enterTerminal('individual')}
             onOpenFrontend={() => enterFrontend('workspace-overview')}
             onOpenSearch={() => setSearchOpen(true)}
             onOpenAudioAlerts={() => {
@@ -787,7 +787,7 @@ export default function App() {
               {/* 1. Application Capabilities Hub — Showcases everything Financia does + launches Dedicated Terminal */}
               <FrontendCapabilityHub
                 activeRegion={activeRegion}
-                onLaunchTerminal={(tab) => enterTerminal(tab || 'compare')}
+                onLaunchTerminal={(tab) => enterTerminal(tab || 'individual')}
                 onJumpToSection={handleJumpToSection}
               />
 
@@ -820,7 +820,12 @@ export default function App() {
               <InvestorToolsWorkbench onJumpToAnalysis={handleOpenInTerminal} />
 
               {/* 6. Global Exchanges & Market Hubs Directory */}
-              <GlobalExchangesGlobeSection onJumpToAnalysis={handleOpenInTerminal} />
+              <GlobalExchangesGlobeSection
+                onJumpToAnalysis={(ticker) => handleOpenInTerminal(ticker, undefined, 'individual')}
+                onCompareExchangeBenchmarks={(primary, peers) =>
+                  handleOpenInTerminal(primary, peers, 'compare')
+                }
+              />
             </main>
           )}
         </>

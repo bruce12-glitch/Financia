@@ -38,11 +38,11 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
   onJumpToAnalysis,
   liveFeedActive = true,
 }) => {
-  const [featuredSymbol, setFeaturedSymbol] = useState<string>('GOLDBEES');
+  const [featuredSymbol, setFeaturedSymbol] = useState<string>('SPY');
   const [showAllStories, setShowAllStories] = useState<boolean>(false);
 
   const featuredAsset = useMemo(() => {
-    return MAJOR_INDICES.find((m) => m.symbol === featuredSymbol) || MAJOR_INDICES[1] || MAJOR_INDICES[0];
+    return MAJOR_INDICES.find((m) => m.symbol === featuredSymbol) || MAJOR_INDICES[2] || MAJOR_INDICES[0];
   }, [featuredSymbol]);
 
   const featuredSparkBounds = useMemo(() => {
@@ -85,7 +85,7 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
         <section aria-label="Market summary">
           <button
             type="button"
-            onClick={() => setFeaturedSymbol('GOLDBEES')}
+            onClick={() => onSelectSymbol(featuredAsset)}
             className="inline-flex items-center gap-1 text-2xl md:text-[28px] font-display font-bold text-[#131722] hover:text-[#2962FF] transition-colors mb-5 cursor-pointer"
           >
             <span>Market summary</span>
@@ -234,10 +234,10 @@ export const MarketSummaryAndIdeas: React.FC<MarketSummaryAndIdeasProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => onSelectSymbol(MAJOR_INDICES[0])}
+                onClick={() => onSelectSymbol(featuredAsset)}
                 className="mt-4 text-xs font-semibold text-[#2962FF] hover:underline inline-flex items-center gap-0.5 cursor-pointer"
               >
-                <span>Inspect NIFTYBEES</span>
+                <span>Open {featuredAsset.symbol} in Fund Terminal</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
