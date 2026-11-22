@@ -6,9 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
-.playwright-cli/
+data/
 .aistudio/
-backend/data/
-amfi_nav_dev.db
-amfi_nav_dev.db-wal
-amfi_nav_dev.db-shm
+*.db
+*.db-wal
+*.db-shm
+

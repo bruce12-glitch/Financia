@@ -3,60 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Financia — Mutual Funds, Gold, Debt Funds &amp; ETFs Intelligence</title>
+    <title>Financia — Mutual Fund Database Engine</title>
     <meta
       name="description"
-      content="Live market intelligence for Indian Direct Mutual Funds, physical-backed Spot Gold (PAXG), and the U.S. Treasury yield curve powered by official AMFI, Binance, and FMP feeds."
+      content="Relational SQLite database engine, live MFPRO & AMFI NAV ingestion pipeline, portfolio holdings explorer, data quality auditor, and read-only SQL workbench for Financia."
     />
-    <meta property="og:title" content="Financia — Mutual Funds, Gold, Debt Funds &amp; ETFs Intelligence" />
+    <meta property="og:title" content="Financia — Mutual Fund Database Engine" />
     <meta
       property="og:description"
-      content="Live market intelligence for Indian Direct Mutual Funds, physical-backed Spot Gold (PAXG), and the U.S. Treasury yield curve powered by official AMFI, Binance, and FMP feeds."
+      content="Relational SQLite database engine, live MFPRO & AMFI NAV ingestion pipeline, portfolio holdings explorer, data quality auditor, and read-only SQL workbench for Financia."
     />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <script>
-      (function () {
-        var EXT_RE = /(?:chrome|moz|safari|edge)-extension:\/\//i;
-        function isExtOnly(filename, stack) {
-          if (filename && EXT_RE.test(filename)) return true;
-          if (stack && EXT_RE.test(stack)) {
-            var frames = String(stack)
-              .split('\n')
-              .map(function (l) { return l.trim(); })
-              .filter(function (l) { return l.indexOf('at ') === 0 || l.indexOf('@') !== -1; });
-            if (frames.length > 0 && frames.every(function (l) { return EXT_RE.test(l); })) {
-              return true;
-            }
-          }
-          return false;
-        }
-        window.addEventListener(
-          'error',
-          function (e) {
-            if (isExtOnly(e.filename, e.error && e.error.stack)) {
-              e.preventDefault();
-              if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-            }
-          },
-          true
-        );
-        window.addEventListener(
-          'unhandledrejection',
-          function (e) {
-            var r = e.reason;
-            if (r && isExtOnly('', r.stack)) {
-              e.preventDefault();
-              if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-            }
-          },
-          true
-        );
-      })();
-    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
   </head>
-  <body class="bg-white text-[#090e1a] antialiased selection:bg-[#2563eb]/20 selection:text-[#090e1a]">
+  <body class="bg-white text-[#090e1a] antialiased">
     <div id="root"></div>
-    <script type="module" src="/frontend/main.tsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+

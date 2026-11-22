@@ -17,14 +17,12 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./*"],
-      "@frontend/*": ["./frontend/*"],
-      "@landing/*": ["./landing/*"],
-      "@backend/*": ["./backend/*"]
+      "@/*": [
+        "./*"
+      ]
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["frontend", "landing", "backend", "server.ts", "vite.config.ts"],
   "exclude": ["dist"]
 }
