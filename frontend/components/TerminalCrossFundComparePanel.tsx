@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -13,26 +13,39 @@ import {
 } from 'recharts';
 import {
   ArrowLeftRight,
+  Database,
   GitCompare,
   Layers,
+  Loader2,
   Newspaper,
   PieChart,
   Scale,
+  Search,
   Sparkles,
   TrendingUp,
 } from 'lucide-react';
 import { SCREENER_FUNDS, ScreenerFundRecord } from '../utils/screenerEngine';
 import { buildHistoricalPortfolioReplay } from '../utils/portfolioAllocatorEngine';
 import { buildCrossFundComparison } from '../utils/rebalanceEngine';
+import { getFundIntelligence } from '../utils/fundIntelligenceEngine';
+import { buildUniformTop10HoldingsForFund } from '../utils/terminalSearchEngine';
+import {
+  fetchV1PortfolioOverlap,
+  searchV1Funds,
+  V1OverlapResult,
+  V1SearchFundItem,
+} from '../services/financiaApiClient';
 import { TerminalComparisonWorkbench } from './TerminalComparisonWorkbench';
 
 export interface TerminalCrossFundComparePanelProps {
   primarySymbol: string;
   comparisonTickers: string[];
+  extraFunds?: ScreenerFundRecord[];
   analysisMode: 'single' | 'multi';
   onSwitchAnalysisMode: (mode: 'single' | 'multi') => void;
   onSelectPrimary: (symbol: string) => void;
   onChangeComparisonTickers: (next: string[]) => void;
+  onHydrateSchemeCode?: (code: string) => Promise<ScreenerFundRecord | null>;
 }
 
 const CROSS_ASSET_PRESETS: Array<{ label: string; a: string; b: string; note: string }> = [
@@ -47,39 +60,68 @@ export const TerminalCrossFundComparePanel: React.FC<
 > = ({
   primarySymbol,
   comparisonTickers,
+  extraFunds = [],
   analysisMode,
   onSwitchAnalysisMode,
   onSelectPrimary,
   onChangeComparisonTickers,
+  onHydrateSchemeCode,
 }) => {
   const [subMode, setSubMode] = useState<'two-fund' | 'multi-studio'>('two-fund');
+  const [dbQuery, setDbQuery] = useState<string>('');
+  const [dbResults, setDbResults] = useState<V1SearchFundItem[]>([]);
+  const [dbSearching, setDbSearching] = useState<boolean>(false);
+  const [hydratingCode, setHydratingCode] = useState<string | null>(null);
+  const [v1Overlap, setV1Overlap] = useState<V1OverlapResult | null>(null);
+  const [aiBriefText, setAiBriefText] = useState<string | null>(null);
+  const [aiBriefLoading, setAiBriefLoading] = useState<boolean>(false);
+  const [aiBriefError, setAiBriefError] = useState<string | null>(null);
+
+  const allCompareFunds = useMemo(() => {
+    const seen = new Set(SCREENER_FUNDS.map((f) => f.symbol.toUpperCase()));
+    const extras = extraFunds.filter((f) => !seen.has(f.symbol.toUpperCase()));
+    return [...extras, ...SCREENER_FUNDS];
+  }, [extraFunds]);
 
   const resolvedInitialA = useMemo(() => {
-    return SCREENER_FUNDS.some((f) => f.symbol === primarySymbol)
+    return allCompareFunds.some((f) => f.symbol.toUpperCase() === primarySymbol.toUpperCase())
       ? primarySymbol
       : 'PPFAS';
-  }, [primarySymbol]);
+  }, [primarySymbol, allCompareFunds]);
 
   const resolvedInitialB = useMemo(() => {
     const firstPeer = comparisonTickers.find(
-      (sym) => sym !== resolvedInitialA && SCREENER_FUNDS.some((f) => f.symbol === sym)
+      (sym) =>
+        sym.toUpperCase() !== resolvedInitialA.toUpperCase() &&
+        allCompareFunds.some((f) => f.symbol.toUpperCase() === sym.toUpperCase())
     );
     if (firstPeer) return firstPeer;
     return resolvedInitialA === 'QQQ' ? 'PPFAS' : 'QQQ';
-  }, [comparisonTickers, resolvedInitialA]);
+  }, [comparisonTickers, resolvedInitialA, allCompareFunds]);
 
   const [symbolA, setSymbolA] = useState<string>(resolvedInitialA);
   const [symbolB, setSymbolB] = useState<string>(resolvedInitialB);
   const [horizonYears, setHorizonYears] = useState<number>(5);
   const [baseInvestment, setBaseInvestment] = useState<number>(100_000);
 
+  useEffect(() => {
+    if (allCompareFunds.some((f) => f.symbol.toUpperCase() === primarySymbol.toUpperCase())) {
+      setSymbolA(primarySymbol);
+    }
+  }, [primarySymbol, allCompareFunds]);
+
   const fundA: ScreenerFundRecord = useMemo(
-    () => SCREENER_FUNDS.find((f) => f.symbol === symbolA) || SCREENER_FUNDS[0],
-    [symbolA]
+    () =>
+      allCompareFunds.find((f) => f.symbol.toUpperCase() === symbolA.toUpperCase()) ||
+      allCompareFunds[0],
+    [symbolA, allCompareFunds]
   );
   const fundB: ScreenerFundRecord = useMemo(
-    () => SCREENER_FUNDS.find((f) => f.symbol === symbolB) || SCREENER_FUNDS[1],
-    [symbolB]
+    () =>
+      allCompareFunds.find((f) => f.symbol.toUpperCase() === symbolB.toUpperCase()) ||
+      allCompareFunds[1] ||
+      allCompareFunds[0],
+    [symbolB, allCompareFunds]
   );
 
   const comparison = useMemo(
@@ -113,6 +155,172 @@ export const TerminalCrossFundComparePanel: React.FC<
     setSymbolB(b);
     onSelectPrimary(a);
     onChangeComparisonTickers([b]);
+  };
+
+  // Debounced search across all 14,481 SQLite schemes for adding into A / B / Multi-Studio
+  useEffect(() => {
+    const trimmed = dbQuery.trim();
+    if (trimmed.length < 2) {
+      setDbResults([]);
+      setDbSearching(false);
+      return;
+    }
+    let cancelled = false;
+    setDbSearching(true);
+    const timer = window.setTimeout(() => {
+      searchV1Funds({ q: trimmed, limit: 8 })
+        .then((items) => {
+          if (!cancelled) setDbResults(items);
+        })
+        .catch(() => {
+          if (!cancelled) setDbResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setDbSearching(false);
+        });
+    }, 180);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [dbQuery]);
+
+  // Fetch /v1/overlap when comparing two instruments (falls back seamlessly to uniform Top 10 overlap)
+  useEffect(() => {
+    let cancelled = false;
+    setAiBriefText(null);
+    setAiBriefError(null);
+    const codeA = fundA.amfiCode || fundA.about.cusipOrAmfi || fundA.symbol;
+    const codeB = fundB.amfiCode || fundB.about.cusipOrAmfi || fundB.symbol;
+    if (/^\d{4,}$/.test(codeA) && /^\d{4,}$/.test(codeB)) {
+      fetchV1PortfolioOverlap(codeA, codeB)
+        .then((res) => {
+          if (!cancelled) setV1Overlap(res);
+        })
+        .catch(() => {
+          if (!cancelled) setV1Overlap(null);
+        });
+    } else {
+      setV1Overlap(null);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [fundA.symbol, fundB.symbol, fundA.amfiCode, fundB.amfiCode, fundA.about.cusipOrAmfi, fundB.about.cusipOrAmfi]);
+
+  // Uniform holdings-level overlap (works for every instrument, enriched with /v1/overlap when present)
+  const resolvedOverlap = useMemo(() => {
+    if (v1Overlap && v1Overlap.top_overlapping_securities.length > 0) {
+      return v1Overlap;
+    }
+    const holdingsA = buildUniformTop10HoldingsForFund(fundA, getFundIntelligence(fundA).topHoldings);
+    const holdingsB = buildUniformTop10HoldingsForFund(fundB, getFundIntelligence(fundB).topHoldings);
+    const mapB = new Map(holdingsB.map((h) => [h.name.toLowerCase(), h]));
+    const overlapping: V1OverlapResult['top_overlapping_securities'] = [];
+    let overlapWeight = 0;
+
+    for (const hA of holdingsA) {
+      const hB = mapB.get(hA.name.toLowerCase());
+      if (hB) {
+        const minW = Number(Math.min(hA.weightPct, hB.weightPct).toFixed(2));
+        overlapWeight += minW;
+        overlapping.push({
+          name: hA.name,
+          isin: hA.tickerOrIsin,
+          sector: hA.sector,
+          weight_a_pct: hA.weightPct,
+          weight_b_pct: hB.weightPct,
+          min_overlap_pct: minW,
+        });
+      }
+    }
+
+    overlapping.sort((a, b) => b.min_overlap_pct - a.min_overlap_pct);
+    return {
+      overlap_count: overlapping.length,
+      overlap_weight_pct: Number(overlapWeight.toFixed(2)),
+      top_overlapping_securities: overlapping.slice(0, 6),
+    };
+  }, [v1Overlap, fundA, fundB]);
+
+  const handleAssignDbScheme = async (
+    item: V1SearchFundItem,
+    target: 'A' | 'B' | 'MULTI'
+  ) => {
+    setHydratingCode(item.scheme_code);
+    try {
+      const hydrated = onHydrateSchemeCode
+        ? await onHydrateSchemeCode(item.scheme_code)
+        : null;
+      const sym = hydrated ? hydrated.symbol : item.scheme_code;
+      if (target === 'A') {
+        setSymbolA(sym);
+        onSelectPrimary(sym);
+      } else if (target === 'B') {
+        setSymbolB(sym);
+        onChangeComparisonTickers([sym]);
+      } else {
+        const nextPeers = Array.from(
+          new Set([
+            ...comparisonTickers.filter((t) => t.toUpperCase() !== primarySymbol.toUpperCase()),
+            sym,
+          ])
+        ).slice(0, 3);
+        onChangeComparisonTickers(nextPeers);
+        setSubMode('multi-studio');
+      }
+      setDbQuery('');
+      setDbResults([]);
+    } finally {
+      setHydratingCode(null);
+    }
+  };
+
+  const handleGenerateCompactBrief = async () => {
+    setAiBriefLoading(true);
+    setAiBriefError(null);
+    try {
+      const payload = {
+        funds: [
+          {
+            scheme_name: fundA.name,
+            scheme_code: fundA.amfiCode || fundA.symbol,
+            nav: fundA.price,
+            expense_ratio: fundA.about.expenseRatioPct,
+            inception_date: fundA.about.inceptionDate,
+            category: fundA.category,
+            asset_class: fundA.about.assetClass,
+          },
+          {
+            scheme_name: fundB.name,
+            scheme_code: fundB.amfiCode || fundB.symbol,
+            nav: fundB.price,
+            expense_ratio: fundB.about.expenseRatioPct,
+            inception_date: fundB.about.inceptionDate,
+            category: fundB.category,
+            asset_class: fundB.about.assetClass,
+          },
+        ],
+        overlap_count: resolvedOverlap.overlap_count,
+        overlap_weight_pct: resolvedOverlap.overlap_weight_pct,
+        top_overlapping_securities: resolvedOverlap.top_overlapping_securities.slice(0, 5),
+      };
+      const res = await fetch('/api/ai/compare-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiBriefError(data?.error || 'Could not generate comparison brief.');
+      } else {
+        setAiBriefText(data?.brief || data?.summary || 'Comparison brief generated.');
+      }
+    } catch {
+      setAiBriefError('Network error requesting compact comparison brief.');
+    } finally {
+      setAiBriefLoading(false);
+    }
   };
 
   return (
@@ -169,10 +377,83 @@ export const TerminalCrossFundComparePanel: React.FC<
         </div>
       </div>
 
+      {/* Search Any 14,481 SQLite Database Scheme to Compare */}
+      <div className="rounded-[12px] bg-white border border-[#e2e8f0] p-3.5 shadow-xs space-y-2.5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#0f172a]">
+            <Database className="w-4 h-4 text-[#2563eb] shrink-0" />
+            <span>Add Any of 14,481 AMFI Mutual Funds / ETFs from Database to Compare</span>
+          </div>
+          <div className="relative flex-1 max-w-[460px]">
+            <Search className="w-3.5 h-3.5 text-[#64748b] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              data-testid="compare-db-search-input"
+              value={dbQuery}
+              onChange={(e) => setDbQuery(e.target.value)}
+              placeholder="Search scheme name, AMFI code, or ISIN (e.g. Parag Parikh, SBI Nifty, HDFC Mid)..."
+              className="w-full h-8 pl-8 pr-8 rounded-[8px] border border-[#cbd5e1] bg-[#f8fafc] focus:bg-white focus:border-[#2563eb] text-xs text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none"
+            />
+            {dbSearching && (
+              <Loader2 className="w-3.5 h-3.5 text-[#2563eb] animate-spin absolute right-2.5 top-1/2 -translate-y-1/2" />
+            )}
+          </div>
+        </div>
+
+        {dbResults.length > 0 && (
+          <div
+            data-testid="compare-db-search-results"
+            className="rounded-[9px] border border-[#e2e8f0] bg-[#f8fafc] divide-y divide-[#e2e8f0] max-h-[240px] overflow-y-auto"
+          >
+            {dbResults.map((item) => (
+              <div
+                key={item.scheme_code}
+                className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs hover:bg-white"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-[#0f172a] truncate">{item.scheme_name}</div>
+                  <div className="text-[11px] font-mono text-[#64748b] truncate">
+                    #{item.scheme_code} · {item.amc} · {item.sub_category || item.asset_class} · NAV ₹
+                    {Number(item.nav || 0).toFixed(2)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    disabled={hydratingCode === item.scheme_code}
+                    onClick={() => handleAssignDbScheme(item, 'A')}
+                    className="px-2 py-1 rounded bg-[#eff6ff] hover:bg-[#2563eb] text-[#1d4ed8] hover:text-white border border-[#bfdbfe] text-[11px] font-semibold cursor-pointer transition-colors"
+                  >
+                    Set A
+                  </button>
+                  <button
+                    type="button"
+                    disabled={hydratingCode === item.scheme_code}
+                    onClick={() => handleAssignDbScheme(item, 'B')}
+                    className="px-2 py-1 rounded bg-[#ecfdf5] hover:bg-[#059669] text-[#047857] hover:text-white border border-[#a7f3d0] text-[11px] font-semibold cursor-pointer transition-colors"
+                  >
+                    Set B
+                  </button>
+                  <button
+                    type="button"
+                    disabled={hydratingCode === item.scheme_code}
+                    onClick={() => handleAssignDbScheme(item, 'MULTI')}
+                    className="px-2 py-1 rounded bg-[#f1f5f9] hover:bg-[#0f172a] text-[#334155] hover:text-white border border-[#cbd5e1] text-[11px] font-semibold cursor-pointer transition-colors"
+                  >
+                    + Multi
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {subMode === 'multi-studio' ? (
         <TerminalComparisonWorkbench
           primarySymbol={primarySymbol}
           comparisonTickers={comparisonTickers}
+          extraFunds={extraFunds}
           analysisMode={analysisMode}
           embeddedInTab
           onSwitchAnalysisMode={onSwitchAnalysisMode}
@@ -202,7 +483,7 @@ export const TerminalCrossFundComparePanel: React.FC<
                   }}
                   className="w-full h-9 rounded-[8px] border border-[#93c5fd] bg-white px-3 text-xs font-semibold text-[#0f172a] focus:outline-none focus:border-[#2563eb] cursor-pointer"
                 >
-                  {SCREENER_FUNDS.map((f) => (
+                  {allCompareFunds.map((f) => (
                     <option key={f.symbol} value={f.symbol}>
                       {f.symbol} — {f.name} ({f.instrumentType === 'Mutual Fund' ? 'MF' : 'ETF'} · {f.category})
                     </option>
@@ -250,7 +531,7 @@ export const TerminalCrossFundComparePanel: React.FC<
                   }}
                   className="w-full h-9 rounded-[8px] border border-[#6ee7b7] bg-white px-3 text-xs font-semibold text-[#0f172a] focus:outline-none focus:border-[#059669] cursor-pointer"
                 >
-                  {SCREENER_FUNDS.map((f) => (
+                  {allCompareFunds.map((f) => (
                     <option key={f.symbol} value={f.symbol}>
                       {f.symbol} — {f.name} ({f.instrumentType === 'Mutual Fund' ? 'MF' : 'ETF'} · {f.category})
                     </option>
@@ -743,6 +1024,85 @@ export const TerminalCrossFundComparePanel: React.FC<
                 ))}
               </div>
             </div>
+          </section>
+          {/* 6. PORTFOLIO HOLDINGS OVERLAP & COMPACT GEMINI COMPARISON BRIEF */}
+          <section
+            data-testid="cross-compare-overlap-ai"
+            className="rounded-[14px] bg-white border border-[#e2e8f0] p-5 shadow-xs space-y-4"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#e2e8f0]">
+              <div>
+                <h3 className="text-[15px] font-display font-bold text-[#0f172a] flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#2563eb]" />
+                  <span>6. Top-10 Holdings Overlap &amp; Compact Comparison Brief</span>
+                </h3>
+                <p className="text-xs text-[#64748b] mt-0.5">
+                  Direct constituent overlap between {fundA.symbol} and {fundB.symbol} with compact summary JSON synthesis
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 rounded-md bg-[#f1f5f9] text-[#0f172a] font-mono text-xs font-semibold tabular-nums">
+                  {resolvedOverlap.overlap_count} shared · {resolvedOverlap.overlap_weight_pct.toFixed(1)}% weight overlap
+                </span>
+                <button
+                  type="button"
+                  data-testid="compare-ai-brief-btn"
+                  disabled={aiBriefLoading}
+                  onClick={handleGenerateCompactBrief}
+                  className="h-8 px-3 rounded-[8px] bg-[#0f172a] hover:bg-[#1e293b] disabled:opacity-60 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  {aiBriefLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
+                  )}
+                  <span>Explain Overlap</span>
+                </button>
+              </div>
+            </div>
+
+            {resolvedOverlap.top_overlapping_securities.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {resolvedOverlap.top_overlapping_securities.map((sec) => (
+                  <div
+                    key={sec.name}
+                    className="rounded-[9px] border border-[#e2e8f0] bg-[#f8fafc] p-3 flex flex-col justify-between"
+                  >
+                    <div className="text-xs font-semibold text-[#0f172a] truncate">{sec.name}</div>
+                    <div className="text-[10.5px] text-[#64748b] mt-0.5 truncate">
+                      {sec.sector} {sec.isin ? `· ${sec.isin}` : ''}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-[11px] font-mono tabular-nums">
+                      <span className="text-[#1d4ed8]">A: {sec.weight_a_pct.toFixed(1)}%</span>
+                      <span className="text-[#047857]">B: {sec.weight_b_pct.toFixed(1)}%</span>
+                      <span className="font-bold text-[#0f172a]">
+                        Overlap {sec.min_overlap_pct.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-[9px] border border-[#bbf7d0] bg-[#f0fdf4] px-3.5 py-2.5 text-xs text-[#065f46]">
+                Zero direct Top-10 constituent overlap detected between {fundA.symbol} ({fundA.category}) and{' '}
+                {fundB.symbol} ({fundB.category}) — strong cross-instrument diversification.
+              </div>
+            )}
+
+            {aiBriefError && (
+              <div className="rounded-[9px] border border-[#fecaca] bg-[#fef2f2] px-3.5 py-2 text-xs text-[#991b1b]">
+                {aiBriefError}
+              </div>
+            )}
+
+            {aiBriefText && (
+              <div
+                data-testid="compare-ai-brief-output"
+                className="rounded-[10px] border border-[#bfdbfe] bg-[#eff6ff]/60 p-4 text-xs text-[#1e293b] leading-relaxed whitespace-pre-line"
+              >
+                {aiBriefText}
+              </div>
+            )}
           </section>
         </div>
       )}

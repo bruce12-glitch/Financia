@@ -8,11 +8,9 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
-  Download,
   ExternalLink,
   Scale,
   Search,
-  ShieldAlert,
   Sunrise,
   Terminal,
   Users,
@@ -31,16 +29,11 @@ import {
   getFundIntelligence,
 } from '../utils/fundIntelligenceEngine';
 import {
-  buildScreenerRiskTableCsv,
   computeInstrumentRiskProfile,
-  computeUniverseRiskSummary,
-  filterByRiskTier,
   InstrumentRiskProfile,
-  RiskTierFilter,
   ScreenerRiskSortKey,
   SortDirection,
   sortScreenerFundsWithRisk,
-  VarMetricBasis,
 } from '../utils/riskAnalyticsEngine';
 import {
   ExposureDonutChart,
@@ -76,8 +69,6 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
   const [query, setQuery] = useState<string>('');
   const [instrumentType, setInstrumentType] = useState<'ALL' | ScreenerInstrumentType>('ALL');
   const [category, setCategory] = useState<string>('All');
-  const [riskTierFilter, setRiskTierFilter] = useState<RiskTierFilter>('ALL');
-  const [varBasis, setVarBasis] = useState<VarMetricBasis>('var95');
   const [sortBy, setSortBy] = useState<ScreenerRiskSortKey>('aum');
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
 
@@ -114,26 +105,10 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
 
   const handleSelectSortPreset = (nextKey: ScreenerRiskSortKey) => {
     setSortBy(nextKey);
-    if (nextKey === 'var95' || nextKey === 'var99' || nextKey === 'cvar95') {
-      setVarBasis(nextKey);
-    }
-    if (
-      nextKey === 'expense' ||
-      nextKey === 'var95' ||
-      nextKey === 'var99' ||
-      nextKey === 'cvar95' ||
-      nextKey === 'maxDrawdown'
-    ) {
+    if (nextKey === 'expense' || nextKey === 'var95' || nextKey === 'maxDrawdown') {
       setSortDir('asc');
     } else {
       setSortDir('desc');
-    }
-  };
-
-  const handleSelectVarBasis = (nextBasis: VarMetricBasis) => {
-    setVarBasis(nextBasis);
-    if (sortBy === 'var95' || sortBy === 'var99' || sortBy === 'cvar95') {
-      setSortBy(nextBasis);
     }
   };
 
@@ -165,27 +140,8 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
       category,
       sortBy: 'aum',
     });
-    const tierFiltered = filterByRiskTier(baseFiltered, riskTierFilter, riskBySymbol);
-    return sortScreenerFundsWithRisk(tierFiltered, sortBy, sortDir, riskBySymbol);
-  }, [funds, query, instrumentType, category, riskTierFilter, sortBy, sortDir, riskBySymbol]);
-
-  const universeRiskSummary = useMemo(
-    () => computeUniverseRiskSummary(filteredFunds, riskBySymbol),
-    [filteredFunds, riskBySymbol]
-  );
-
-  const handleExportRiskCsv = () => {
-    const csv = buildScreenerRiskTableCsv(filteredFunds, riskBySymbol);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `financia-screener-risk-${varBasis}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+    return sortScreenerFundsWithRisk(baseFiltered, sortBy, sortDir, riskBySymbol);
+  }, [funds, query, instrumentType, category, sortBy, sortDir, riskBySymbol]);
 
   const activeFund = useMemo(() => {
     return funds.find((f) => f.id === selectedId) || filteredFunds[0] || funds[0];
@@ -468,8 +424,6 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
               <option value="return1y">1Y Return (High → Low)</option>
               <option value="return3y">3Y Return (High → Low)</option>
               <option value="var95">VaR 95% (Safest → Riskiest)</option>
-              <option value="var99">VaR 99% Tail (Safest → Riskiest)</option>
-              <option value="cvar95">CVaR 95% Shortfall (Safest → Riskiest)</option>
               <option value="maxDrawdown">Max Drawdown (Shallowest → Deepest)</option>
               <option value="expense">Expense Ratio (Low → High)</option>
               <option value="change">Day Change %</option>
@@ -492,128 +446,24 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
           {/* LEFT 6 COLUMNS: STICKY HIGH-DENSITY SCREENER LIST WITH SORTABLE VaR & MAX DRAWDOWN */}
           <div className="xl:col-span-6 xl:sticky xl:top-20 xl:self-start rounded-[12px] bg-white border border-[#e2e8f0] overflow-hidden">
-            <div className="px-4 py-3 border-b border-[#e2e8f0] bg-[#f8fafc] space-y-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-3.5 h-3.5 text-[#2563eb]" />
-                  <span className="text-xs font-semibold text-[#0f172a]">
-                    Matching Instruments ({filteredFunds.length})
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {/* VaR Basis Switcher: 1M 95% VaR vs 99% Tail VaR vs 95% CVaR Expected Shortfall */}
-                  <div
-                    role="tablist"
-                    aria-label="Select Value-at-Risk basis"
-                    className="inline-flex items-center p-0.5 rounded-[7px] bg-white border border-[#cbd5e1]"
-                  >
-                    {(
-                      [
-                        { id: 'var95', label: 'VaR 95%' },
-                        { id: 'var99', label: 'VaR 99%' },
-                        { id: 'cvar95', label: 'CVaR 95%' },
-                      ] as const
-                    ).map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={varBasis === opt.id}
-                        data-testid={`screener-var-basis-${opt.id}`}
-                        onClick={() => handleSelectVarBasis(opt.id)}
-                        className={`px-2 py-0.5 rounded-[5px] text-[10.5px] font-mono font-semibold transition-colors cursor-pointer ${
-                          varBasis === opt.id
-                            ? 'bg-[#0f172a] text-white'
-                            : 'text-[#475569] hover:text-[#0f172a]'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    type="button"
-                    data-testid="screener-export-risk-csv"
-                    onClick={handleExportRiskCsv}
-                    title="Export filtered screener with VaR, CVaR & Max Drawdown to CSV"
-                    className="h-6 px-2 rounded-[6px] border border-[#cbd5e1] bg-white hover:border-[#2563eb] hover:text-[#2563eb] text-[10.5px] font-mono font-semibold text-[#334155] inline-flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>CSV</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Tail Risk Tier Quick Filters + Institutional Universe Summary Telemetry */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-[#e2e8f0]/80">
-                <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Filter by tail risk tier">
-                  {(
-                    [
-                      { id: 'ALL', label: 'All Risk' },
-                      { id: 'Low Tail Risk', label: 'Low Tail' },
-                      { id: 'Moderate', label: 'Moderate' },
-                      { id: 'Elevated+', label: 'Elevated+' },
-                    ] as const
-                  ).map((tier) => (
-                    <button
-                      key={tier.id}
-                      type="button"
-                      data-testid={`screener-risk-tier-${tier.id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
-                      onClick={() => setRiskTierFilter(tier.id)}
-                      className={`px-2 py-0.5 rounded-[5px] text-[10.5px] font-medium border transition-colors cursor-pointer ${
-                        riskTierFilter === tier.id
-                          ? 'bg-[#2563eb] text-white border-[#2563eb]'
-                          : 'bg-white text-[#475569] border-[#cbd5e1] hover:border-[#94a3b8] hover:text-[#0f172a]'
-                      }`}
-                    >
-                      {tier.label}
-                    </button>
-                  ))}
-                </div>
-
-                {universeRiskSummary.count > 0 && (
-                  <div
-                    data-testid="screener-universe-risk-summary"
-                    className="flex flex-wrap items-center gap-2.5 text-[10.5px] font-mono text-[#475569] tabular-nums"
-                  >
-                    <span>
-                      Med VaR:{' '}
-                      <strong className="text-[#0f172a]">
-                        {universeRiskSummary.medianVar95MonthlyPct.toFixed(2)}%
-                      </strong>
-                    </span>
-                    <span>
-                      Med DD:{' '}
-                      <strong className="text-[#0f172a]">
-                        {universeRiskSummary.medianMaxDrawdown3YPct.toFixed(1)}%
-                      </strong>
-                    </span>
-                    {universeRiskSummary.safestVarFund && (
-                      <span className="hidden sm:inline">
-                        Safest:{' '}
-                        <strong className="text-[#047857]">
-                          {universeRiskSummary.safestVarFund.symbol}{' '}
-                          {universeRiskSummary.safestVarFund.var95MonthlyPct.toFixed(2)}%
-                        </strong>
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+            <div className="px-4 py-3 border-b border-[#e2e8f0] bg-[#f8fafc] flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-[#0f172a]">
+                Matching Instruments ({filteredFunds.length})
+              </span>
+              <span className="text-[11px] font-mono text-[#64748b]">
+                Click VaR / Max DD headers to sort · Row to inspect
+              </span>
             </div>
 
             {filteredFunds.length === 0 ? (
               <div className="p-8 text-center text-xs text-[#64748b]">
-                No mutual funds or ETFs match the active filters.{' '}
+                No mutual funds or ETFs match &ldquo;{query}&rdquo;.{' '}
                 <button
                   type="button"
                   onClick={() => {
                     setQuery('');
                     setCategory('All');
                     setInstrumentType('ALL');
-                    setRiskTierFilter('ALL');
                   }}
                   className="text-[#2563eb] underline font-medium cursor-pointer"
                 >
@@ -621,7 +471,7 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto xl:max-h-[calc(100vh-175px)] xl:overflow-y-auto">
+              <div className="overflow-x-auto xl:max-h-[calc(100vh-140px)] xl:overflow-y-auto">
                 <table
                   data-testid="screener-table"
                   className="w-full text-left border-collapse"
@@ -629,16 +479,7 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
                   <thead>
                     <tr className="border-b border-[#e2e8f0] text-[10.5px] font-mono uppercase tracking-wider text-[#64748b] bg-white sticky top-0 z-10">
                       <th className="py-2.5 pl-4 pr-2 font-semibold">Fund / ETF</th>
-                      <th
-                        className="py-2.5 px-2 font-semibold text-right"
-                        aria-sort={
-                          sortBy === 'price'
-                            ? sortDir === 'asc'
-                              ? 'ascending'
-                              : 'descending'
-                            : 'none'
-                        }
-                      >
+                      <th className="py-2.5 px-2 font-semibold text-right">
                         <button
                           type="button"
                           data-testid="screener-sort-price"
@@ -655,16 +496,7 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
                           )}
                         </button>
                       </th>
-                      <th
-                        className="py-2.5 px-2 font-semibold text-right"
-                        aria-sort={
-                          sortBy === 'return1y'
-                            ? sortDir === 'asc'
-                              ? 'ascending'
-                              : 'descending'
-                            : 'none'
-                        }
-                      >
+                      <th className="py-2.5 px-2 font-semibold text-right">
                         <button
                           type="button"
                           data-testid="screener-sort-return1y"
@@ -681,60 +513,30 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
                           )}
                         </button>
                       </th>
-                      <th
-                        className="py-2.5 px-2 font-semibold text-right"
-                        aria-sort={
-                          sortBy === varBasis
-                            ? sortDir === 'asc'
-                              ? 'ascending'
-                              : 'descending'
-                            : 'none'
-                        }
-                      >
+                      <th className="py-2.5 px-2 font-semibold text-right">
                         <button
                           type="button"
                           data-testid="screener-sort-var95"
-                          onClick={() => handleColumnSort(varBasis)}
-                          title={
-                            varBasis === 'var95'
-                              ? 'Sort by 1-Month 95% Value-at-Risk (VaR)'
-                              : varBasis === 'var99'
-                              ? 'Sort by 1-Month 99% Tail Value-at-Risk (VaR)'
-                              : 'Sort by 1-Month 95% Conditional VaR (Expected Shortfall)'
-                          }
+                          onClick={() => handleColumnSort('var95')}
+                          title="Sort by 1-Month 95% Value-at-Risk (VaR)"
                           className={`inline-flex items-center gap-0.5 uppercase hover:text-[#0f172a] cursor-pointer whitespace-nowrap ${
-                            sortBy === varBasis ? 'text-[#2563eb] font-bold' : ''
+                            sortBy === 'var95' ? 'text-[#2563eb] font-bold' : ''
                           }`}
                         >
-                          <span>
-                            {varBasis === 'var95'
-                              ? 'VaR 95%'
-                              : varBasis === 'var99'
-                              ? 'VaR 99%'
-                              : 'CVaR 95%'}
-                          </span>
-                          {sortBy === varBasis ? (
+                          <span>VaR 95%</span>
+                          {sortBy === 'var95' ? (
                             sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                           ) : (
                             <ArrowUpDown className="w-2.5 h-2.5 opacity-60" />
                           )}
                         </button>
                       </th>
-                      <th
-                        className="py-2.5 px-2 font-semibold text-right"
-                        aria-sort={
-                          sortBy === 'maxDrawdown'
-                            ? sortDir === 'asc'
-                              ? 'ascending'
-                              : 'descending'
-                            : 'none'
-                        }
-                      >
+                      <th className="py-2.5 px-2 font-semibold text-right">
                         <button
                           type="button"
                           data-testid="screener-sort-maxdd"
                           onClick={() => handleColumnSort('maxDrawdown')}
-                          title="Sort by 3-Year Maximum Drawdown (Peak-to-Trough)"
+                          title="Sort by 3-Year Maximum Drawdown"
                           className={`inline-flex items-center gap-0.5 uppercase hover:text-[#0f172a] cursor-pointer whitespace-nowrap ${
                             sortBy === 'maxDrawdown' ? 'text-[#2563eb] font-bold' : ''
                           }`}
@@ -759,28 +561,13 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
                       const inCompare = compareIds.includes(item.symbol);
                       const rowIntel = getFundIntelligence(item);
                       const rowRisk = riskBySymbol[item.symbol] || computeInstrumentRiskProfile(item, rowIntel);
-
-                      const activeVarVal =
-                        varBasis === 'var95'
-                          ? rowRisk.var95MonthlyPct
-                          : varBasis === 'var99'
-                          ? rowRisk.var99MonthlyPct
-                          : rowRisk.cvar95MonthlyPct;
-                      const absVar = Math.abs(activeVarVal);
+                      const absVar = Math.abs(rowRisk.var95MonthlyPct);
                       const varColor =
-                        absVar < 2.8
+                        absVar < 2.5
                           ? 'text-[#047857]'
-                          : absVar < 8.0
+                          : absVar < 7
                           ? 'text-[#b45309]'
                           : 'text-[#dc2626]';
-                      const varBarColor =
-                        absVar < 2.8
-                          ? '#059669'
-                          : absVar < 8.0
-                          ? '#d97706'
-                          : '#dc2626';
-                      const varBarPct = Math.min(100, Math.max(6, (absVar / 16) * 100));
-
                       const absDd = Math.abs(rowRisk.maxDrawdown3YPct);
                       const ddColor =
                         absDd < 6
@@ -788,13 +575,6 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
                           : absDd < 18
                           ? 'text-[#b45309]'
                           : 'text-[#dc2626]';
-                      const ddBarColor =
-                        absDd < 6
-                          ? '#059669'
-                          : absDd < 18
-                          ? '#d97706'
-                          : '#dc2626';
-                      const ddBarPct = Math.min(100, Math.max(5, (absDd / 32) * 100));
 
                       return (
                         <tr
@@ -879,40 +659,24 @@ export const MutualFundEtfScreenerSection: React.FC<MutualFundEtfScreenerSection
                           </td>
                           <td
                             data-testid={`screener-var-${item.symbol}`}
-                            title={`1M 95% VaR: ${rowRisk.var95MonthlyPct.toFixed(2)}% | 1M 99% VaR: ${rowRisk.var99MonthlyPct.toFixed(2)}% | 95% CVaR: ${rowRisk.cvar95MonthlyPct.toFixed(2)}% | Annual 95% VaR: ${rowRisk.var95AnnualPct.toFixed(1)}% | Tier: ${rowRisk.riskTier}`}
                             className="py-3 px-2 text-right font-mono tabular-nums whitespace-nowrap"
                           >
                             <div className={`text-xs font-semibold ${varColor}`}>
-                              {activeVarVal.toFixed(2)}%
+                              {rowRisk.var95MonthlyPct.toFixed(2)}%
                             </div>
-                            <div className="text-[9.5px] text-[#64748b]">
-                              {varBasis === 'var95'
-                                ? `CVaR ${rowRisk.cvar95MonthlyPct.toFixed(1)}%`
-                                : `Ann ${rowRisk.var95AnnualPct.toFixed(0)}%`}
-                            </div>
-                            <div className="mt-1 ml-auto w-14 h-1 rounded-full bg-[#e2e8f0] overflow-hidden">
-                              <div
-                                className="h-full rounded-full"
-                                style={{ width: `${varBarPct}%`, backgroundColor: varBarColor }}
-                              />
+                            <div className="text-[10px] text-[#64748b]">
+                              1M tail
                             </div>
                           </td>
                           <td
                             data-testid={`screener-maxdd-${item.symbol}`}
-                            title={`3Y Max Drawdown: ${rowRisk.maxDrawdown3YPct.toFixed(1)}% | Calmar Ratio: ${rowRisk.calmarRatio.toFixed(2)} | 3Y Vol: ${rowRisk.volatility3YPct.toFixed(1)}% | Worst Month: ${rowRisk.worstObservedMonthPct.toFixed(2)}%`}
                             className="py-3 px-2 text-right font-mono tabular-nums whitespace-nowrap"
                           >
                             <div className={`text-xs font-semibold ${ddColor}`}>
                               {rowRisk.maxDrawdown3YPct.toFixed(1)}%
                             </div>
-                            <div className="text-[9.5px] text-[#64748b]">
+                            <div className="text-[10px] text-[#64748b]">
                               Calmar {rowRisk.calmarRatio.toFixed(1)}
-                            </div>
-                            <div className="mt-1 ml-auto w-14 h-1 rounded-full bg-[#e2e8f0] overflow-hidden">
-                              <div
-                                className="h-full rounded-full"
-                                style={{ width: `${ddBarPct}%`, backgroundColor: ddBarColor }}
-                              />
                             </div>
                           </td>
                           <td className="py-3 pl-2 pr-4 text-right whitespace-nowrap">

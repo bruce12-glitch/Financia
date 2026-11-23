@@ -25,6 +25,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["frontend", "landing", "backend", "server.ts", "vite.config.ts"],
+  "include": ["frontend", "landing", "backend", "server", "server.ts", "vite.config.ts"],
   "exclude": ["dist"]
 }

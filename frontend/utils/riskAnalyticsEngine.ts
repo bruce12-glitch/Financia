@@ -13,27 +13,7 @@ export type ScreenerRiskSortKey =
   | 'expense'
   | 'change'
   | 'var95'
-  | 'var99'
-  | 'cvar95'
   | 'maxDrawdown';
-
-export type VarMetricBasis = 'var95' | 'var99' | 'cvar95';
-
-export type RiskTierFilter = 'ALL' | 'Low Tail Risk' | 'Moderate' | 'Elevated+';
-
-export interface UniverseRiskSummary {
-  count: number;
-  medianVar95MonthlyPct: number;
-  medianMaxDrawdown3YPct: number;
-  safestVarFund: { symbol: string; var95MonthlyPct: number } | null;
-  riskiestVarFund: { symbol: string; var95MonthlyPct: number } | null;
-  deepestDrawdownFund: { symbol: string; maxDrawdown3YPct: number } | null;
-  tierCounts: {
-    low: number;
-    moderate: number;
-    elevatedOrHigh: number;
-  };
-}
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -275,14 +255,6 @@ export function sortScreenerFundsWithRisk(
         // Sort by absolute VaR risk magnitude so asc = safest (smallest loss), desc = riskiest (largest loss)
         valA = Math.abs(resolvedRisk(a).var95MonthlyPct);
         valB = Math.abs(resolvedRisk(b).var95MonthlyPct);
-        break;
-      case 'var99':
-        valA = Math.abs(resolvedRisk(a).var99MonthlyPct);
-        valB = Math.abs(resolvedRisk(b).var99MonthlyPct);
-        break;
-      case 'cvar95':
-        valA = Math.abs(resolvedRisk(a).cvar95MonthlyPct);
-        valB = Math.abs(resolvedRisk(b).cvar95MonthlyPct);
         break;
       case 'maxDrawdown':
         // Sort by absolute Max DD magnitude so asc = shallowest drawdown, desc = deepest drawdown
@@ -791,141 +763,6 @@ export function buildComparisonCsv(
       risk.maxDrawdown3YPct.toFixed(1),
       risk.calmarRatio.toFixed(2),
       tenYearNetWealthOn100k,
-    ]
-      .map(esc)
-      .join(',');
-  });
-
-  return [headers.join(','), ...rows].join('\n');
-}
-
-/**
- * Filters a list of screener instruments by institutional tail-risk tier.
- */
-export function filterByRiskTier(
-  funds: ScreenerFundRecord[],
-  tierFilter: RiskTierFilter,
-  riskMap?: Record<string, InstrumentRiskProfile>
-): ScreenerFundRecord[] {
-  if (tierFilter === 'ALL') return funds;
-  return funds.filter((f) => {
-    const risk = riskMap?.[f.symbol] || computeInstrumentRiskProfile(f);
-    if (tierFilter === 'Elevated+') {
-      return risk.riskTier === 'Elevated' || risk.riskTier === 'High Tail Risk';
-    }
-    return risk.riskTier === tierFilter;
-  });
-}
-
-/**
- * Computes institutional summary telemetry across the currently visible screener universe.
- */
-export function computeUniverseRiskSummary(
-  funds: ScreenerFundRecord[],
-  riskMap?: Record<string, InstrumentRiskProfile>
-): UniverseRiskSummary {
-  if (funds.length === 0) {
-    return {
-      count: 0,
-      medianVar95MonthlyPct: 0,
-      medianMaxDrawdown3YPct: 0,
-      safestVarFund: null,
-      riskiestVarFund: null,
-      deepestDrawdownFund: null,
-      tierCounts: { low: 0, moderate: 0, elevatedOrHigh: 0 },
-    };
-  }
-
-  const profiles = funds.map((f) => riskMap?.[f.symbol] || computeInstrumentRiskProfile(f));
-  const sortedVars = profiles.map((p) => p.var95MonthlyPct).sort((a, b) => a - b);
-  const sortedDds = profiles.map((p) => p.maxDrawdown3YPct).sort((a, b) => a - b);
-
-  let safest = profiles[0];
-  let riskiest = profiles[0];
-  let deepestDd = profiles[0];
-  let low = 0;
-  let moderate = 0;
-  let elevatedOrHigh = 0;
-
-  for (const p of profiles) {
-    if (Math.abs(p.var95MonthlyPct) < Math.abs(safest.var95MonthlyPct)) safest = p;
-    if (Math.abs(p.var95MonthlyPct) > Math.abs(riskiest.var95MonthlyPct)) riskiest = p;
-    if (Math.abs(p.maxDrawdown3YPct) > Math.abs(deepestDd.maxDrawdown3YPct)) deepestDd = p;
-    if (p.riskTier === 'Low Tail Risk') low += 1;
-    else if (p.riskTier === 'Moderate') moderate += 1;
-    else elevatedOrHigh += 1;
-  }
-
-  return {
-    count: profiles.length,
-    medianVar95MonthlyPct: Number(percentile(sortedVars, 0.5).toFixed(2)),
-    medianMaxDrawdown3YPct: Number(percentile(sortedDds, 0.5).toFixed(1)),
-    safestVarFund: { symbol: safest.symbol, var95MonthlyPct: safest.var95MonthlyPct },
-    riskiestVarFund: { symbol: riskiest.symbol, var95MonthlyPct: riskiest.var95MonthlyPct },
-    deepestDrawdownFund: { symbol: deepestDd.symbol, maxDrawdown3YPct: deepestDd.maxDrawdown3YPct },
-    tierCounts: { low, moderate, elevatedOrHigh },
-  };
-}
-
-/**
- * Exports the filtered & sorted screener table with full Value-at-Risk & Max Drawdown metrics as CSV.
- */
-export function buildScreenerRiskTableCsv(
-  funds: ScreenerFundRecord[],
-  riskMap?: Record<string, InstrumentRiskProfile>
-): string {
-  const headers = [
-    'Symbol',
-    'Name',
-    'Type',
-    'Category',
-    'Currency',
-    'Price/NAV',
-    '1Y Return (%)',
-    '3Y Return (%)',
-    'Expense Ratio (%)',
-    'Sharpe (3Y)',
-    'Sortino (3Y)',
-    'Treynor (3Y)',
-    '1M VaR 95% (%)',
-    '1M VaR 99% (%)',
-    '1M CVaR 95% (%)',
-    'Annual VaR 95% (%)',
-    'Max Drawdown 3Y (%)',
-    'Calmar Ratio',
-    'Volatility 3Y (%)',
-    'Tail Risk Tier',
-  ];
-
-  const esc = (v: string | number | null) => {
-    const str = v === null || v === undefined ? '' : String(v);
-    return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
-  };
-
-  const rows = funds.map((f) => {
-    const intel = getFundIntelligence(f);
-    const risk = riskMap?.[f.symbol] || computeInstrumentRiskProfile(f, intel);
-    return [
-      f.symbol,
-      f.name,
-      f.instrumentType,
-      f.category,
-      f.currency,
-      f.price.toFixed(2),
-      f.returnsTotal['1Y'] ?? '',
-      f.returnsTotal['3Y'] ?? '',
-      f.about.expenseRatioPct.toFixed(2),
-      f.keyStats.sharpe3Y.toFixed(2),
-      intel.ratios.sortino3Y.toFixed(2),
-      intel.ratios.treynorRatio.toFixed(2),
-      risk.var95MonthlyPct.toFixed(2),
-      risk.var99MonthlyPct.toFixed(2),
-      risk.cvar95MonthlyPct.toFixed(2),
-      risk.var95AnnualPct.toFixed(2),
-      risk.maxDrawdown3YPct.toFixed(1),
-      risk.calmarRatio.toFixed(2),
-      risk.volatility3YPct.toFixed(1),
-      risk.riskTier,
     ]
       .map(esc)
       .join(',');

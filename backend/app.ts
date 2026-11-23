@@ -19,12 +19,63 @@ import {
 import { securityAuditLog } from './services/auditLogService.ts';
 import { financiaStore, PersistenceStore } from './services/persistenceService.ts';
 import { initNavDatabase, NavDatabaseService } from './services/navDatabaseService.ts';
+import { FinanciaMutualFundDatabase } from '../server/database.ts';
+import { DatasetSyncService } from '../server/syncService.ts';
+import { FinnhubService } from '../server/finnhubService.ts';
+import {
+  createDatabaseRouter,
+  createGlobalExchangeRouter,
+  loadDefaultTerminalCatalogIfPresent,
+} from '../server/routes.ts';
+import { createV1Router } from '../server/v1Routes.ts';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
+
+let sharedMfDb: FinanciaMutualFundDatabase | null = null;
+let sharedSyncService: DatasetSyncService | null = null;
+let sharedFinnhubService: FinnhubService | null = null;
+
+function getOrInitMfEngine(skipWarmup = false): {
+  mfDb: FinanciaMutualFundDatabase;
+  syncService: DatasetSyncService;
+  finnhubService: FinnhubService;
+} {
+  if (!sharedMfDb) {
+    sharedMfDb = new FinanciaMutualFundDatabase();
+    if (sharedMfDb.isTerminalCatalogEmpty()) {
+      try {
+        const audit = loadDefaultTerminalCatalogIfPresent(sharedMfDb, ROOT_DIR);
+        if (audit) {
+          console.log(
+            `[Financia DB] Loaded 14k AMFI Terminal catalog: ${audit.parsedCount} schemes (${audit.activeCount} active, ${audit.etfCount} ETFs) in ${audit.durationMs}ms`
+          );
+        }
+      } catch (err) {
+        console.warn('[Financia DB] Failed to preload AMFI catalog:', err instanceof Error ? err.message : err);
+      }
+    }
+  }
+  if (!sharedSyncService) {
+    sharedSyncService = new DatasetSyncService(sharedMfDb);
+    if (!skipWarmup) {
+      sharedSyncService.warmupEmptyDatasets().catch((err) => {
+        console.warn('[Financia DB] Background warmup error:', err instanceof Error ? err.message : err);
+      });
+    }
+  }
+  if (!sharedFinnhubService) {
+    sharedFinnhubService = new FinnhubService();
+  }
+  return {
+    mfDb: sharedMfDb,
+    syncService: sharedSyncService,
+    finnhubService: sharedFinnhubService,
+  };
+}
 
 function resolveServerPort(): number {
   const portFlagIdx = process.argv.findIndex(
@@ -52,6 +103,7 @@ function resolveServerPort(): number {
 export interface BackendAppOptions {
   store?: PersistenceStore;
   navDb?: NavDatabaseService;
+  mfDb?: FinanciaMutualFundDatabase;
   skipVite?: boolean;
 }
 
@@ -61,12 +113,20 @@ export async function createBackendApp(
 ): Promise<express.Express> {
   const store = options.store ?? financiaStore;
   const navDb = options.navDb ?? initNavDatabase({ cwd: ROOT_DIR });
+  const engine = options.mfDb
+    ? {
+        mfDb: options.mfDb,
+        syncService: new DatasetSyncService(options.mfDb),
+        finnhubService: new FinnhubService(),
+      }
+    : getOrInitMfEngine(Boolean(options.skipVite));
+
   const app = express();
 
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
   app.use(applySecurityHeaders);
-  app.use(express.json({ limit: '64kb' }));
+  app.use(express.json({ limit: '2.5mb' }));
 
   const authRateLimiter = createRateLimiter({
     windowMs: 15 * 60 * 1000,
@@ -84,7 +144,7 @@ export async function createBackendApp(
 
   const apiRateLimiter = createRateLimiter({
     windowMs: 60 * 1000,
-    maxRequests: 300,
+    maxRequests: 450,
     keyPrefix: 'api',
   });
 
@@ -93,10 +153,13 @@ export async function createBackendApp(
   app.use('/api/auth/login', authRateLimiter);
   app.use('/api/auth/register', authRateLimiter);
 
-  // 1. Mount Modular Backend API Routes
+  // 1. Mount Modular Backend API Routes + Integrated SQLite 14k DB + /api/v1 + Finnhub Proxy
   app.use('/api/auth', createAuthRouter(store));
+  app.use('/api/db', createDatabaseRouter(engine.mfDb, engine.syncService, ROOT_DIR));
+  app.use('/api/v1', createV1Router(engine.mfDb, navDb));
+  app.use('/api/global', createGlobalExchangeRouter(engine.finnhubService));
   app.use('/api', createScreenerRouter());
-  app.use('/api', createStocksRouter(navDb));
+  app.use('/api', createStocksRouter(navDb, engine.mfDb));
   app.use('/api', createMarketsRouter());
   app.use('/api', createWorkspaceRouter(store));
   app.use('/api', createAiRouter());

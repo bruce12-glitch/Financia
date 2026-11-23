@@ -13,6 +13,11 @@ import {
   synthesizeCustomTickerReport,
   validateTickerInput,
 } from '../../frontend/utils/stockEngine.ts';
+import { SCREENER_FUNDS } from '../../frontend/utils/screenerEngine.ts';
+import {
+  buildTerminalSuggestions,
+  TerminalSuggestionFilter,
+} from '../../frontend/utils/terminalSearchEngine.ts';
 import { isGeminiConfigured } from '../services/geminiService.ts';
 import {
   enrichStockQuote,
@@ -38,6 +43,8 @@ import {
   searchApiNinjasEtfs,
 } from '../services/etfFmpService.ts';
 import { getNavDatabase, NavDatabaseService } from '../services/navDatabaseService.ts';
+import { FinanciaMutualFundDatabase } from '../../server/database.ts';
+import { buildUniformFundDossier } from '../../server/v1Routes.ts';
 
 const VALID_TIMEFRAMES = new Set(['1D', '1W', '1M', '4M', '1Y']);
 type SupportedTimeframe = '1D' | '1W' | '1M' | '4M' | '1Y';
@@ -47,7 +54,10 @@ function normalizeTimeframe(raw: unknown): SupportedTimeframe {
   return VALID_TIMEFRAMES.has(candidate) ? (candidate as SupportedTimeframe) : '4M';
 }
 
-export function createStocksRouter(navDbOverride?: NavDatabaseService | null): Router {
+export function createStocksRouter(
+  navDbOverride?: NavDatabaseService | null,
+  mfDb?: FinanciaMutualFundDatabase | null
+): Router {
   const router = Router();
   const resolveNavDb = (): NavDatabaseService | null => navDbOverride ?? getNavDatabase();
 
@@ -127,14 +137,16 @@ export function createStocksRouter(navDbOverride?: NavDatabaseService | null): R
       }
     }
 
-    if (process.env.ALPACA_KEY_ID && process.env.ALPACA_SECRET_KEY) {
+    const alpacaKeyId = process.env.ALPACA_KEY_ID || process.env.ALPACA_API_KEY || '';
+    const alpacaSecretKey = process.env.ALPACA_SECRET_KEY || process.env.ALPACA_API_SECRET || '';
+    if (alpacaKeyId && alpacaSecretKey) {
       try {
         const alpRes = await fetchWithTimeout(
           `https://data.alpaca.markets/v2/stocks/${encodeURIComponent(symbol)}/trades/latest`,
           {
             headers: {
-              'APCA-API-KEY-ID': process.env.ALPACA_KEY_ID,
-              'APCA-API-SECRET-KEY': process.env.ALPACA_SECRET_KEY,
+              'APCA-API-KEY-ID': alpacaKeyId,
+              'APCA-API-SECRET-KEY': alpacaSecretKey,
             },
           }
         );
@@ -242,22 +254,96 @@ export function createStocksRouter(navDbOverride?: NavDatabaseService | null): R
   });
 
   const handleAnalyze = async (req: Request, res: Response) => {
-    const rawTicker = String(req.query.ticker || 'GOLDBEES').trim().toUpperCase();
+    const rawTicker = String(req.query.ticker || 'QQQ').trim().toUpperCase();
     const check = validateTickerInput(rawTicker);
     if (!check.valid) {
       res.status(400).json({ error: check.error || 'Invalid symbol format.' });
       return;
     }
 
-    const { stock, source } = await enrichStockQuote(check.normalized);
+    let { stock, source } = await enrichStockQuote(check.normalized);
+    const db = resolveNavDb();
+    let navDbDetail = null;
+    let navDbHistory = null;
+    let terminalDbFund = null;
+
+    if (db && db.isConnected()) {
+      const detail = db.getSchemeDetail(check.normalized);
+      if (detail) {
+        navDbDetail = detail;
+        navDbHistory = db.getSchemeHistory(check.normalized, { page: 1, pageSize: 60 });
+      }
+    }
+
+    if (mfDb) {
+      const rawDossier = mfDb.getTerminalFundDossier(check.normalized);
+      const uniform = buildUniformFundDossier(mfDb, rawDossier);
+      if (uniform) {
+        terminalDbFund = uniform;
+        const navPrice = uniform.nav > 0 ? Number(uniform.nav.toFixed(2)) : stock.price;
+        const hay = `${uniform.instrument_type} ${uniform.asset_class} ${uniform.sub_category} ${uniform.scheme_name}`.toLowerCase();
+        const mappedSector: 'Mutual Funds' | 'Gold & Bullion' | 'Debt Funds' | 'ETFs' =
+          hay.includes('gold') || hay.includes('silver') || hay.includes('bullion')
+            ? 'Gold & Bullion'
+            : uniform.instrument_type === 'ETF'
+              ? 'ETFs'
+              : hay.includes('debt') || hay.includes('gilt') || hay.includes('liquid') || hay.includes('bond')
+                ? 'Debt Funds'
+                : 'Mutual Funds';
+        stock = {
+          ...stock,
+          ticker: uniform.scheme_code,
+          name: uniform.scheme_name,
+          sector: mappedSector,
+          price: navPrice,
+          currencyUnit: 'INR',
+          dataSource: 'Financia SQLite AMFI Catalog',
+        };
+        source = 'sqlite-terminal-catalog';
+      }
+    }
+
     res.json({
       source,
       stock,
+      navDbDetail,
+      navDbHistory,
+      terminalDbFund,
     });
   };
 
   router.get('/funds/analyze', handleAnalyze);
   router.get('/stocks/analyze', handleAnalyze);
+
+  // Unified Fund Terminal database autocomplete suggestions (Core 20 ETFs/MFs + SQLite nav_master schemes)
+  router.get('/terminal/suggest', (req, res) => {
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    const rawFilter = typeof req.query.filter === 'string' ? req.query.filter : 'ALL';
+    const validFilters = new Set<TerminalSuggestionFilter>(['ALL', 'ETF', 'Mutual Fund', 'SQLITE_DB']);
+    const filter: TerminalSuggestionFilter = validFilters.has(rawFilter as TerminalSuggestionFilter)
+      ? (rawFilter as TerminalSuggestionFilter)
+      : 'ALL';
+    const limit = Math.min(60, Math.max(1, Number(req.query.limit || 24) || 24));
+
+    const db = resolveNavDb();
+    const navDbSchemes = db && db.isConnected() ? db.listSchemes(100, 0) : [];
+    const suggestions = buildTerminalSuggestions({
+      query,
+      catalogFunds: SCREENER_FUNDS,
+      navDbSchemes,
+      filter,
+      limit,
+    });
+
+    res.json({
+      source: db && db.isConnected() ? 'catalog+sqlite-nav-master' : 'catalog-only',
+      query,
+      filter,
+      totalCatalog: SCREENER_FUNDS.length,
+      totalNavDb: navDbSchemes.length,
+      suggestions,
+    });
+  });
 
   const handleTechnicals = async (req: Request, res: Response) => {
     const check = validateTickerInput(String(req.params.ticker || 'GOLDBEES'));

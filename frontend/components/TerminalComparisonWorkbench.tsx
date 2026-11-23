@@ -38,6 +38,7 @@ import {
 export interface TerminalComparisonWorkbenchProps {
   primarySymbol: string;
   comparisonTickers: string[];
+  extraFunds?: ScreenerFundRecord[];
   analysisMode: 'single' | 'multi';
   embeddedInTab?: boolean;
   onSwitchAnalysisMode: (mode: 'single' | 'multi') => void;
@@ -68,6 +69,7 @@ function formatMoney(value: number, currency: 'INR' | 'USD'): string {
 export const TerminalComparisonWorkbench: React.FC<TerminalComparisonWorkbenchProps> = ({
   primarySymbol,
   comparisonTickers,
+  extraFunds = [],
   analysisMode,
   embeddedInTab = false,
   onSwitchAnalysisMode,
@@ -78,13 +80,19 @@ export const TerminalComparisonWorkbench: React.FC<TerminalComparisonWorkbenchPr
   const [pickerSymbol, setPickerSymbol] = useState<string>('');
   const [compareSubTab, setCompareSubTab] = useState<'matrix' | 'charts' | 'blend'>('matrix');
 
+  const allAvailableFunds: ScreenerFundRecord[] = useMemo(() => {
+    const seen = new Set(SCREENER_FUNDS.map((f) => f.symbol.toUpperCase()));
+    const extras = extraFunds.filter((f) => !seen.has(f.symbol.toUpperCase()));
+    return [...extras, ...SCREENER_FUNDS];
+  }, [extraFunds]);
+
   const primaryFund: ScreenerFundRecord = useMemo(() => {
     const up = primarySymbol.trim().toUpperCase();
     return (
-      SCREENER_FUNDS.find((f) => f.symbol.toUpperCase() === up || f.id.toUpperCase() === up) ||
-      SCREENER_FUNDS[0]
+      allAvailableFunds.find((f) => f.symbol.toUpperCase() === up || f.id.toUpperCase() === up) ||
+      allAvailableFunds[0]
     );
-  }, [primarySymbol]);
+  }, [primarySymbol, allAvailableFunds]);
 
   const primaryIntel = useMemo(() => getFundIntelligence(primaryFund), [primaryFund]);
   const primaryValidation = useMemo(
@@ -116,7 +124,7 @@ export const TerminalComparisonWorkbench: React.FC<TerminalComparisonWorkbenchPr
     for (const raw of comparisonTickers) {
       const up = raw.trim().toUpperCase();
       if (seen.has(up)) continue;
-      const match = SCREENER_FUNDS.find(
+      const match = allAvailableFunds.find(
         (f) => f.symbol.toUpperCase() === up || f.id.toUpperCase() === up
       );
       if (match) {
@@ -128,10 +136,10 @@ export const TerminalComparisonWorkbench: React.FC<TerminalComparisonWorkbenchPr
 
     // In multi mode, if only primary is present, auto-attach 2 category peers so Best vs Worst always works
     if (list.length < 2) {
-      const autoPeers = selectPeerComparisonSymbols(primaryFund.symbol, SCREENER_FUNDS, 2);
+      const autoPeers = selectPeerComparisonSymbols(primaryFund.symbol, allAvailableFunds, 2);
       for (const peerSym of autoPeers) {
         if (seen.has(peerSym)) continue;
-        const match = SCREENER_FUNDS.find((f) => f.symbol.toUpperCase() === peerSym);
+        const match = allAvailableFunds.find((f) => f.symbol.toUpperCase() === peerSym);
         if (match) {
           list.push(match);
           seen.add(match.symbol.toUpperCase());
@@ -140,7 +148,7 @@ export const TerminalComparisonWorkbench: React.FC<TerminalComparisonWorkbenchPr
     }
 
     return list;
-  }, [primaryFund, comparisonTickers]);
+  }, [primaryFund, comparisonTickers, allAvailableFunds]);
 
   const comparison = useMemo(
     () => buildMultiFundComparison(activeBasketFunds, priorityMode),
@@ -195,8 +203,8 @@ export const TerminalComparisonWorkbench: React.FC<TerminalComparisonWorkbenchPr
 
   const availableToAdd = useMemo(() => {
     const taken = new Set(activeBasketFunds.map((f) => f.symbol.toUpperCase()));
-    return SCREENER_FUNDS.filter((f) => !taken.has(f.symbol.toUpperCase()));
-  }, [activeBasketFunds]);
+    return allAvailableFunds.filter((f) => !taken.has(f.symbol.toUpperCase()));
+  }, [activeBasketFunds, allAvailableFunds]);
 
   const handleAddPeer = (sym: string) => {
     if (!sym) return;
@@ -221,13 +229,13 @@ export const TerminalComparisonWorkbench: React.FC<TerminalComparisonWorkbenchPr
   };
 
   const handleAutoPeers = () => {
-    const peers = selectPeerComparisonSymbols(primaryFund.symbol, SCREENER_FUNDS, 2);
+    const peers = selectPeerComparisonSymbols(primaryFund.symbol, allAvailableFunds, 2);
     onChangeComparisonTickers(peers);
   };
 
   const handleCompareThisSingleInstrument = () => {
     if (comparisonTickers.length === 0) {
-      const peers = selectPeerComparisonSymbols(primaryFund.symbol, SCREENER_FUNDS, 2);
+      const peers = selectPeerComparisonSymbols(primaryFund.symbol, allAvailableFunds, 2);
       onChangeComparisonTickers(peers);
     }
     onSwitchAnalysisMode('multi');
@@ -487,7 +495,7 @@ export const TerminalComparisonWorkbench: React.FC<TerminalComparisonWorkbenchPr
       <div className="px-5 py-4 border-b border-[#e2e8f0] bg-[#f8fafc] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="text-[11px] font-mono uppercase tracking-[0.08em] text-[#2563eb] font-semibold">
-            Live Multi-Instrument Decision Engine · All {SCREENER_FUNDS.length} Funds &amp; ETFs
+            Live Multi-Instrument Decision Engine · {allAvailableFunds.length} Loaded + 14,481 AMFI Schemes
           </div>
           <h3 className="text-lg font-display font-bold text-[#0f172a] mt-0.5">
             Head-to-Head Best vs. Worst Comparison Studio
@@ -567,13 +575,13 @@ export const TerminalComparisonWorkbench: React.FC<TerminalComparisonWorkbenchPr
 
             {comparison.items.length < 4 && (
               <select
-                aria-label="Add any of the 20 funds or ETFs to compare"
+                aria-label="Add any loaded fund or ETF to compare"
                 data-testid="workbench-add-fund-select"
                 value={pickerSymbol}
                 onChange={(e) => handleAddPeer(e.target.value)}
                 className="h-8 rounded-[8px] border border-[#cbd5e1] bg-white px-2.5 text-xs text-[#0f172a] focus:outline-none focus:border-[#2563eb] cursor-pointer"
               >
-                <option value="">+ Add from all {SCREENER_FUNDS.length} funds ({comparison.items.length}/4)</option>
+                <option value="">+ Add from {allAvailableFunds.length} loaded funds ({comparison.items.length}/4)</option>
                 {availableToAdd.map((f) => (
                   <option key={f.symbol} value={f.symbol}>
                     {f.symbol} — {f.name} ({f.instrumentType})

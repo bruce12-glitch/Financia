@@ -6,14 +6,11 @@ import {
   buildCompoundingCurveSeries,
   buildComparisonCsv,
   buildRiskReturnFrontierData,
-  buildScreenerRiskTableCsv,
   buildStressTestScenarios,
   computeBlendedPortfolioMetrics,
   computeCorrelationMatrix,
   computeInstrumentRiskProfile,
   computeMinVarWeights,
-  computeUniverseRiskSummary,
-  filterByRiskTier,
   sortScreenerFundsWithRisk,
 } from './riskAnalyticsEngine';
 
@@ -44,7 +41,7 @@ test('computeInstrumentRiskProfile produces mathematically valid VaR, CVaR, Max 
   assert.equal(liquid.riskTier, 'Low Tail Risk');
 });
 
-test('sortScreenerFundsWithRisk accurately sorts by var95, var99, cvar95, and maxDrawdown in both asc and desc directions', () => {
+test('sortScreenerFundsWithRisk accurately sorts by var95 and maxDrawdown in both asc and desc directions', () => {
   const varAsc = sortScreenerFundsWithRisk(SCREENER_FUNDS, 'var95', 'asc');
   const varDesc = sortScreenerFundsWithRisk(SCREENER_FUNDS, 'var95', 'desc');
   assert.equal(varAsc.length, SCREENER_FUNDS.length);
@@ -63,21 +60,6 @@ test('sortScreenerFundsWithRisk accurately sorts by var95, var99, cvar95, and ma
   }
   assert.equal(varAsc[0].symbol, 'LIQUIDBEES');
 
-  // var99 and cvar95 monotonicity
-  const var99Asc = sortScreenerFundsWithRisk(SCREENER_FUNDS, 'var99', 'asc');
-  const cvarDesc = sortScreenerFundsWithRisk(SCREENER_FUNDS, 'cvar95', 'desc');
-  for (let i = 1; i < var99Asc.length; i++) {
-    const prev = Math.abs(computeInstrumentRiskProfile(var99Asc[i - 1]).var99MonthlyPct);
-    const curr = Math.abs(computeInstrumentRiskProfile(var99Asc[i]).var99MonthlyPct);
-    assert.ok(prev <= curr, `var99 asc violated at ${i}`);
-  }
-  for (let i = 1; i < cvarDesc.length; i++) {
-    const prev = Math.abs(computeInstrumentRiskProfile(cvarDesc[i - 1]).cvar95MonthlyPct);
-    const curr = Math.abs(computeInstrumentRiskProfile(cvarDesc[i]).cvar95MonthlyPct);
-    assert.ok(prev >= curr, `cvar95 desc violated at ${i}`);
-  }
-  assert.equal(var99Asc[0].symbol, 'LIQUIDBEES');
-
   const ddAsc = sortScreenerFundsWithRisk(SCREENER_FUNDS, 'maxDrawdown', 'asc');
   const ddDesc = sortScreenerFundsWithRisk(SCREENER_FUNDS, 'maxDrawdown', 'desc');
   for (let i = 1; i < ddAsc.length; i++) {
@@ -87,37 +69,6 @@ test('sortScreenerFundsWithRisk accurately sorts by var95, var99, cvar95, and ma
   }
   assert.equal(ddAsc[0].symbol, 'LIQUIDBEES');
   assert.ok(Math.abs(ddDesc[0].keyStats.maxDrawdown3YPct) >= Math.abs(ddDesc[ddDesc.length - 1].keyStats.maxDrawdown3YPct));
-});
-
-test('computeUniverseRiskSummary, filterByRiskTier, and buildScreenerRiskTableCsv cover all 20 instruments accurately', () => {
-  const summary = computeUniverseRiskSummary(SCREENER_FUNDS);
-  assert.equal(summary.count, 20);
-  assert.ok(summary.medianVar95MonthlyPct < 0);
-  assert.ok(summary.medianMaxDrawdown3YPct < 0);
-  assert.equal(summary.safestVarFund?.symbol, 'LIQUIDBEES');
-  assert.ok(summary.riskiestVarFund !== null);
-  assert.ok(summary.deepestDrawdownFund !== null);
-  assert.equal(
-    summary.tierCounts.low + summary.tierCounts.moderate + summary.tierCounts.elevatedOrHigh,
-    20
-  );
-
-  const lowOnly = filterByRiskTier(SCREENER_FUNDS, 'Low Tail Risk');
-  const modOnly = filterByRiskTier(SCREENER_FUNDS, 'Moderate');
-  const highOnly = filterByRiskTier(SCREENER_FUNDS, 'Elevated+');
-  assert.equal(lowOnly.length, summary.tierCounts.low);
-  assert.equal(modOnly.length, summary.tierCounts.moderate);
-  assert.equal(highOnly.length, summary.tierCounts.elevatedOrHigh);
-
-  const csv = buildScreenerRiskTableCsv(SCREENER_FUNDS);
-  const lines = csv.split('\n');
-  assert.equal(lines.length, 21); // header + 20 instruments
-  assert.ok(lines[0].includes('1M VaR 95% (%)'));
-  assert.ok(lines[0].includes('1M VaR 99% (%)'));
-  assert.ok(lines[0].includes('1M CVaR 95% (%)'));
-  assert.ok(lines[0].includes('Max Drawdown 3Y (%)'));
-  assert.ok(csv.includes('LIQUIDBEES'));
-  assert.ok(csv.includes('PPFAS'));
 });
 
 test('computeCorrelationMatrix returns symmetric bounded Pearson r matrix with unit diagonal', () => {
