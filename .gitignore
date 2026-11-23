@@ -16,3 +16,5 @@ backend/data/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+public/assets/aistudio/
+
