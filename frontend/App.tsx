@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, Volume2, VolumeX, X } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Activity, ArrowRight, Bell, Briefcase, Volume2, VolumeX, X } from 'lucide-react';
 import {
   EarthHeroSection,
   LandingAccessGateSection,
@@ -7,16 +8,27 @@ import {
   LiveMacroBullionSection,
   RocketFooterSection,
 } from '../landing';
+import {
+  AdaptiveWorkspaceBar,
+  WorkspaceRouteTab,
+} from './components/AdaptiveWorkspaceBar';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { FrontendWorkspaceHeader } from './components/FrontendWorkspaceHeader';
 import { FrontendCapabilityHub } from './components/FrontendCapabilityHub';
 import { InstrumentAnalysisSection } from './components/InstrumentAnalysisSection';
 import { InvestorToolsWorkbench } from './components/InvestorToolsWorkbench';
 import { LiveStockTerminal, TerminalTabId } from './components/LiveStockTerminal';
 import { MarketSummaryAndIdeas } from './components/MarketSummaryAndIdeas';
+import { ModularLayoutDrawer } from './components/ModularLayoutDrawer';
 import { MutualFundEtfScreenerSection } from './components/MutualFundEtfScreenerSection';
 import { AccountSecurityModal } from './components/AccountSecurityModal';
 import { GlobalModals } from './components/GlobalModals';
 import { AlertTargetAsset } from './components/SetAlertModal';
+import { useFirebaseAuth } from './context/FirebaseAuthContext';
+import { BacktesterLabPage } from './features/backtester/BacktesterLabPage';
+import { PortfolioTrackerPage } from './features/portfolio/PortfolioTrackerPage';
+import { VirtualizedScreenerPanel } from './features/screener/VirtualizedScreenerPanel';
+import { DashboardWidgetId, useWorkspaceStore } from './store/useWorkspaceStore';
 import { INITIAL_STOCKS } from './data/marketData';
 import { ALL_SEARCHABLE_SYMBOLS } from './data/tradingViewData';
 import {
@@ -37,6 +49,7 @@ import {
 import {
   AuthMode,
   AuthSession,
+  AuthUser,
   clearAuthSession,
   loadStoredAuthSession,
   persistAuthSession,
@@ -69,6 +82,11 @@ function buildInitialUniverseStocks(): StockQuote[] {
 }
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user: firebaseUser } = useFirebaseAuth();
+  const pinnedWidgets = useWorkspaceStore((s) => s.pinnedWidgets);
+
   const [stocks, setStocks] = useState<StockQuote[]>(() => buildInitialUniverseStocks());
   const [selectedTicker, setSelectedTicker] = useState<string>('QQQ');
   const [liveFeedActive, setLiveFeedActive] = useState<boolean>(true);
@@ -77,13 +95,58 @@ export default function App() {
   const [authSession, setAuthSession] = useState<AuthSession | null>(() => loadStoredAuthSession());
   const [activeView, setActiveView] = useState<'landing' | 'frontend' | 'terminal'>(() => {
     const stored = loadStoredAuthSession();
-    if (!stored) return 'landing';
     if (typeof window !== 'undefined') {
       if (window.location.search.includes('view=landing')) return 'landing';
       if (window.location.pathname.startsWith('/terminal')) return 'terminal';
+      if (
+        window.location.pathname.startsWith('/portfolio') ||
+        window.location.pathname.startsWith('/backtest') ||
+        window.location.pathname.startsWith('/screener') ||
+        window.location.pathname.startsWith('/workspace') ||
+        window.location.pathname.startsWith('/frontend')
+      ) {
+        return 'frontend';
+      }
     }
-    return 'frontend';
+    return stored ? 'frontend' : 'landing';
   });
+
+  const [workspaceRouteTab, setWorkspaceRouteTab] = useState<WorkspaceRouteTab>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname;
+      if (p.startsWith('/portfolio')) return 'portfolio';
+      if (p.startsWith('/backtest')) return 'backtest';
+      if (p.startsWith('/screener')) return 'screener';
+      if (p.startsWith('/terminal')) return 'terminal';
+    }
+    return 'overview';
+  });
+
+  useEffect(() => {
+    const p = location.pathname;
+    if (p.startsWith('/portfolio')) {
+      setWorkspaceRouteTab('portfolio');
+      setActiveView('frontend');
+    } else if (p.startsWith('/backtest')) {
+      setWorkspaceRouteTab('backtest');
+      setActiveView('frontend');
+    } else if (p.startsWith('/screener')) {
+      setWorkspaceRouteTab('screener');
+      setActiveView('frontend');
+    } else if (p.startsWith('/terminal')) {
+      setWorkspaceRouteTab('terminal');
+      setActiveView('terminal');
+    } else if (p.startsWith('/workspace') || p.startsWith('/frontend')) {
+      setWorkspaceRouteTab('overview');
+      setActiveView('frontend');
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (firebaseUser && activeView === 'landing' && !location.search.includes('view=landing')) {
+      setActiveView('frontend');
+    }
+  }, [firebaseUser, activeView, location.search]);
   const [terminalTabRequest, setTerminalTabRequest] = useState<{
     tab: TerminalTabId;
     nonce: number;
@@ -720,25 +783,202 @@ export default function App() {
     [authSession?.token]
   );
 
-  const showAuthenticatedShell = Boolean(
-    authSession && (activeView === 'frontend' || activeView === 'terminal')
+  const handleSelectWorkspaceTab = useCallback(
+    (tab: WorkspaceRouteTab) => {
+      setWorkspaceRouteTab(tab);
+      if (tab === 'terminal') {
+        setActiveView('terminal');
+        navigate('/terminal');
+      } else {
+        setActiveView('frontend');
+        const routeMap: Record<Exclude<WorkspaceRouteTab, 'terminal'>, string> = {
+          overview: '/workspace',
+          portfolio: '/portfolio',
+          backtest: '/backtest',
+          screener: '/screener',
+        };
+        navigate(routeMap[tab]);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [navigate]
   );
-  const showTerminalWorkspace = Boolean(authSession && activeView === 'terminal');
+
+  const effectiveWorkspaceUser: AuthUser = authSession?.user ?? (firebaseUser
+    ? {
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName || 'Financia Investor',
+        email: firebaseUser.email || 'investor@financia.app',
+        provider: 'google',
+        initials: (firebaseUser.displayName || firebaseUser.email || 'FI')
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((part) => part[0]?.toUpperCase() || '')
+          .join('') || 'FI',
+        createdAt: firebaseUser.metadata?.creationTime || new Date().toISOString(),
+      }
+    : {
+        id: 'guest-workspace',
+        name: 'Workspace Desk',
+        email: 'Sign in for Cloud Sync',
+        provider: 'email',
+        initials: 'WD',
+        createdAt: new Date().toISOString(),
+      });
+
+  const isDirectWorkspaceRoute =
+    location.pathname.startsWith('/portfolio') ||
+    location.pathname.startsWith('/backtest') ||
+    location.pathname.startsWith('/screener') ||
+    location.pathname.startsWith('/workspace');
+
+  const showAuthenticatedShell = Boolean(
+    (authSession || firebaseUser || isDirectWorkspaceRoute) &&
+      (activeView === 'frontend' || activeView === 'terminal')
+  );
+  const showTerminalWorkspace = Boolean(
+    showAuthenticatedShell && (activeView === 'terminal' || workspaceRouteTab === 'terminal')
+  );
+
+  const renderModularWidget = (widgetId: DashboardWidgetId) => {
+    switch (widgetId) {
+      case 'portfolio-pulse':
+        return (
+          <div
+            key={widgetId}
+            className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-6"
+          >
+            <div className="rounded-[12px] border border-[#e2e8f0] dark:border-[#1f2937] bg-[#f8fafc] dark:bg-[#111827] p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-[10px] bg-[#0d9488]/10 text-[#0d9488] dark:text-[#14b8a6] flex items-center justify-center shrink-0">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-[#0d9488] dark:text-[#14b8a6]">
+                    Portfolio Ledger · CAS / CSV · FIFO Tax Lots · Exact XIRR
+                  </div>
+                  <h2 className="font-display font-semibold text-base text-[#090e1a] dark:text-white mt-0.5">
+                    Real Portfolio Tracker &amp; Smart Tax-Harvesting Desk
+                  </h2>
+                  <p className="text-xs text-[#64748b] dark:text-[#94a3b8] mt-0.5">
+                    Import NSDL/CDSL/MFCentral CAS or broker CSVs, inspect hidden fund overlap, and
+                    harvest your ₹1.25L tax-free LTCG allowance.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSelectWorkspaceTab('portfolio')}
+                className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#090e1a] dark:bg-white text-white dark:text-[#090e1a] px-4 py-2 text-xs font-semibold shrink-0 cursor-pointer"
+              >
+                Open Portfolio &amp; CAS
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'instrument-analysis':
+        return (
+          <InstrumentAnalysisSection
+            key={widgetId}
+            selectedSymbol={selectedTicker}
+            onSelectInstrumentSymbol={handleSelectPrimaryTicker}
+            onJumpToTerminal={(ticker, peers) => handleOpenInTerminal(ticker, peers, 'individual')}
+          />
+        );
+
+      case 'performance-map':
+        return (
+          <MarketSummaryAndIdeas
+            key={widgetId}
+            onSelectSymbol={(row) => {
+              handleSelectPrimaryTicker(row.symbol);
+              handleJumpToSection('instrument-analysis');
+            }}
+            onSelectNews={setSelectedNews}
+            onSelectIdea={setSelectedIdea}
+            onJumpToAnalysis={handleOpenInTerminal}
+            liveFeedActive={liveFeedActive}
+          />
+        );
+
+      case 'gateway-screener':
+        return (
+          <div key={widgetId} className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <VirtualizedScreenerPanel
+              onInspectSymbol={(sym) => {
+                handleSelectPrimaryTicker(sym);
+                handleJumpToSection('instrument-analysis');
+              }}
+            />
+          </div>
+        );
+
+      case 'backtester-preview':
+        return (
+          <div
+            key={widgetId}
+            className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4"
+          >
+            <div className="rounded-[12px] border border-[#e2e8f0] dark:border-[#1f2937] bg-[#f8fafc] dark:bg-[#111827] p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-[10px] bg-[#2563eb]/10 text-[#2563eb] dark:text-[#60a5fa] flex items-center justify-center shrink-0">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-[#2563eb] dark:text-[#60a5fa]">
+                    Walk-Forward Replay · Brinson Attribution · Macro Regimes
+                  </div>
+                  <h2 className="font-display font-semibold text-base text-[#090e1a] dark:text-white mt-0.5">
+                    Multi-Asset Backtester &amp; Factor Attribution Lab
+                  </h2>
+                  <p className="text-xs text-[#64748b] dark:text-[#94a3b8] mt-0.5">
+                    Simulate custom SIP &amp; rebalance schedules on 60fps canvas charts, run 2008 /
+                    2020 / 2022 stress replays, and inspect Monte Carlo terminal bands.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSelectWorkspaceTab('backtest')}
+                className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-4 py-2 text-xs font-semibold shrink-0 cursor-pointer"
+              >
+                Launch Backtester Lab
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'sip-tax-workbench':
+        return (
+          <InvestorToolsWorkbench
+            key={widgetId}
+            onJumpToAnalysis={handleOpenInTerminal}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-white text-[#0d253d] flex flex-col">
-      {showAuthenticatedShell && authSession ? (
+    <div className="min-h-screen bg-white dark:bg-[#090d16] text-[#090e1a] dark:text-[#f8fafc] flex flex-col transition-colors duration-200">
+      {showAuthenticatedShell ? (
         <>
           <FrontendWorkspaceHeader
-            currentUser={authSession.user}
+            currentUser={effectiveWorkspaceUser}
             activeView={showTerminalWorkspace ? 'terminal' : 'frontend'}
             activeRegion={activeRegion}
             savedAlertsCount={alerts.length}
             alertAudioEnabled={alertAudioPrefs.masterEnabled}
             onToggleRegion={handleToggleRegion}
             onJumpToSection={handleJumpToSection}
-            onOpenTerminal={() => enterTerminal('individual')}
-            onOpenFrontend={() => enterFrontend('workspace-overview')}
+            onOpenTerminal={() => handleSelectWorkspaceTab('terminal')}
+            onOpenFrontend={() => handleSelectWorkspaceTab('overview')}
             onOpenSearch={() => setSearchOpen(true)}
             onOpenAudioAlerts={() => {
               const active = stocks.find((s) => s.ticker === selectedTicker) || stocks[0];
@@ -756,9 +996,13 @@ export default function App() {
             onSignOut={handleSignOut}
           />
 
+          <AdaptiveWorkspaceBar
+            activeTab={showTerminalWorkspace ? 'terminal' : workspaceRouteTab}
+            onSelectTab={handleSelectWorkspaceTab}
+          />
+
           {showTerminalWorkspace ? (
             <main id="terminal-section" data-testid="terminal-workspace" className="flex-1">
-              {/* Separate Dedicated Multi-Fund Analysis, Comparison, Allocator & Bulk Data Terminal (/terminal) */}
               <LiveStockTerminal
                 stocks={stocks}
                 selectedTicker={selectedTicker}
@@ -771,7 +1015,7 @@ export default function App() {
                 onComparisonTickersChange={handleComparisonTickersChange}
                 initialTab={terminalTabRequest.tab}
                 tabRequestNonce={terminalTabRequest.nonce}
-                onBackToWorkspace={() => enterFrontend('workspace-overview')}
+                onBackToWorkspace={() => handleSelectWorkspaceTab('overview')}
                 onOpenSetAlert={(stock) =>
                   setAlertTarget({
                     ticker: stock.ticker,
@@ -780,6 +1024,37 @@ export default function App() {
                     unit: stock.currencyUnit || 'INR',
                   })
                 }
+              />
+            </main>
+          ) : workspaceRouteTab === 'portfolio' ? (
+            <main id="portfolio-section" className="flex-1">
+              <PortfolioTrackerPage
+                stocks={stocks}
+                onInspectSymbol={(sym) => {
+                  handleSelectPrimaryTicker(sym);
+                  handleSelectWorkspaceTab('overview');
+                  setTimeout(() => handleJumpToSection('instrument-analysis'), 80);
+                }}
+              />
+            </main>
+          ) : workspaceRouteTab === 'backtest' ? (
+            <main id="backtest-section" className="flex-1">
+              <BacktesterLabPage />
+            </main>
+          ) : workspaceRouteTab === 'screener' ? (
+            <main id="screener-section" className="flex-1">
+              <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+                <VirtualizedScreenerPanel
+                  onInspectSymbol={(sym) => {
+                    handleSelectPrimaryTicker(sym);
+                    handleOpenInTerminal(sym);
+                  }}
+                />
+              </div>
+              <MutualFundEtfScreenerSection
+                externalSelectedSymbol={selectedTicker}
+                onJumpToAnalysis={handleOpenInTerminal}
+                onJumpToCommunity={() => handleSelectWorkspaceTab('overview')}
               />
             </main>
           ) : (
@@ -795,34 +1070,8 @@ export default function App() {
                 }}
               />
 
-              {/* 2. Dedicated Instrument Analysis Desk (Interactive Quant Chart, Technicals, Risk/Capture, Stress & Sizing) */}
-              <InstrumentAnalysisSection
-                selectedSymbol={selectedTicker}
-                onSelectInstrumentSymbol={handleSelectPrimaryTicker}
-                onJumpToTerminal={(ticker, peers) => handleOpenInTerminal(ticker, peers, 'individual')}
-              />
-
-              {/* 3. User-Definable Asset Class Performance Map, Neutral Watchboard & Sovereign Yield Curve */}
-              <MarketSummaryAndIdeas
-                onSelectSymbol={(row) => {
-                  handleSelectPrimaryTicker(row.symbol);
-                  handleJumpToSection('instrument-analysis');
-                }}
-                onSelectNews={setSelectedNews}
-                onSelectIdea={setSelectedIdea}
-                onJumpToAnalysis={handleOpenInTerminal}
-                liveFeedActive={liveFeedActive}
-              />
-
-              {/* 4. Mutual Fund & ETF Screener with Deep Dossier & Filtering */}
-              <MutualFundEtfScreenerSection
-                externalSelectedSymbol={selectedTicker}
-                onJumpToAnalysis={handleOpenInTerminal}
-                onJumpToCommunity={() => handleJumpToSection('market-summary')}
-              />
-
-              {/* 5. Step-Up SIP & Direct Plan Savings Calculator */}
-              <InvestorToolsWorkbench onJumpToAnalysis={handleOpenInTerminal} />
+              {/* Modular Customizable Dashboard Widgets in User-Defined Order */}
+              {pinnedWidgets.map((wid) => renderModularWidget(wid))}
             </main>
           )}
         </>
@@ -980,6 +1229,17 @@ export default function App() {
         token={authSession?.token || null}
         onClose={() => setSecurityModalOpen(false)}
       />
+
+      <CommandPaletteModal
+        onSelectSymbol={(sym) => {
+          handleSelectPrimaryTicker(sym);
+          handleSelectWorkspaceTab('overview');
+          setTimeout(() => handleJumpToSection('instrument-analysis'), 80);
+        }}
+        onNavigateTab={handleSelectWorkspaceTab}
+      />
+
+      <ModularLayoutDrawer />
     </div>
   );
 }
