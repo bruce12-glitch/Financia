@@ -1,0 +1,368 @@
+{
+  "entities": {
+    "UserWorkspaceProfile": {
+      "title": "User Workspace Profile",
+      "description": "Per-user adaptive 4-in-1 workspace preferences, theme, density, guidance posture, and pinned dashboard modules.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "theme": {
+          "type": "string",
+          "enum": ["light", "dark"]
+        },
+        "density": {
+          "type": "string",
+          "enum": ["comfortable", "compact"]
+        },
+        "guidanceMode": {
+          "type": "string",
+          "enum": ["guided", "pro"]
+        },
+        "baseCurrency": {
+          "type": "string",
+          "enum": ["INR", "USD"]
+        },
+        "pinnedWidgets": {
+          "type": "array",
+          "description": "Ordered dashboard module IDs (max 12)."
+        },
+        "customMapSymbols": {
+          "type": "array",
+          "description": "User-defined Asset Class Performance Map symbols (max 40)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "theme",
+        "density",
+        "guidanceMode",
+        "baseCurrency",
+        "pinnedWidgets",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Portfolio": {
+      "title": "Portfolio Account",
+      "description": "Named user investment portfolio with target asset allocation weights and drift threshold.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["INR", "USD"]
+        },
+        "targetEquityPct": {
+          "type": "number"
+        },
+        "targetDebtPct": {
+          "type": "number"
+        },
+        "targetGoldPct": {
+          "type": "number"
+        },
+        "driftThresholdPct": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "name",
+        "currency",
+        "targetEquityPct",
+        "targetDebtPct",
+        "targetGoldPct",
+        "driftThresholdPct",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PortfolioTransaction": {
+      "title": "Immutable Portfolio Transaction",
+      "description": "Append-only cashflow and unit ledger entry imported from CAS/CSV or entered manually with decimal string precision.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "portfolioId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "pattern": "^[A-Za-z0-9._\\-^]+$"
+        },
+        "schemeName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "isin": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 24
+        },
+        "assetClass": {
+          "type": "string",
+          "enum": ["Equity", "Debt", "Gold", "Hybrid", "Global ETF"]
+        },
+        "txType": {
+          "type": "string",
+          "enum": ["BUY", "SELL", "SIP", "SWITCH_IN", "SWITCH_OUT", "DIVIDEND"]
+        },
+        "tradeDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "units": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24,
+          "pattern": "^[0-9]+(\\.[0-9]{1,6})?$"
+        },
+        "price": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24,
+          "pattern": "^[0-9]+(\\.[0-9]{1,6})?$"
+        },
+        "amount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 28,
+          "pattern": "^[0-9]+(\\.[0-9]{1,4})?$"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["INR", "USD"]
+        },
+        "source": {
+          "type": "string",
+          "enum": ["CAS", "CSV", "MANUAL"]
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "portfolioId",
+        "symbol",
+        "schemeName",
+        "assetClass",
+        "txType",
+        "tradeDate",
+        "units",
+        "price",
+        "amount",
+        "currency",
+        "source",
+        "idempotencyKey",
+        "createdAt"
+      ]
+    },
+    "SavedBacktest": {
+      "title": "Saved Multi-Asset Backtest",
+      "description": "Persisted multi-asset backtest strategy, rebalance rules, and summary risk-return metrics.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "rebalanceFrequency": {
+          "type": "string",
+          "enum": ["NONE", "MONTHLY", "QUARTERLY", "ANNUAL", "DRIFT_5PCT"]
+        },
+        "initialCapital": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24,
+          "pattern": "^[0-9]+(\\.[0-9]{1,4})?$"
+        },
+        "monthlySip": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24,
+          "pattern": "^[0-9]+(\\.[0-9]{1,4})?$"
+        },
+        "horizonYears": {
+          "type": "number"
+        },
+        "benchmarkSymbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "allocations": {
+          "type": "array",
+          "description": "Bounded list of symbol/weight pairs (max 15)."
+        },
+        "summaryCagrPct": {
+          "type": "number"
+        },
+        "summarySharpe": {
+          "type": "number"
+        },
+        "summaryMaxDrawdownPct": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "title",
+        "rebalanceFrequency",
+        "initialCapital",
+        "monthlySip",
+        "horizonYears",
+        "benchmarkSymbol",
+        "allocations",
+        "summaryCagrPct",
+        "summarySharpe",
+        "summaryMaxDrawdownPct",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PortfolioAlert": {
+      "title": "Portfolio Price & Drift Alert",
+      "description": "User-configured price, drift, or tax-harvesting alert with terminal state locking.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "pattern": "^[A-Za-z0-9._\\-^]+$"
+        },
+        "alertType": {
+          "type": "string",
+          "enum": ["PRICE_ABOVE", "PRICE_BELOW", "DRIFT_THRESHOLD", "TAX_HARVEST"]
+        },
+        "targetValue": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24,
+          "pattern": "^[0-9]+(\\.[0-9]{1,6})?$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "TRIGGERED", "DISMISSED"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "symbol",
+        "alertType",
+        "targetValue",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserWorkspaceProfile" },
+      "description": "Private user workspace preferences, theme, density, and custom dashboard module arrangement."
+    },
+    "/users/{userId}/portfolios/{portfolioId}": {
+      "schema": { "$ref": "#/entities/Portfolio" },
+      "description": "User-owned investment portfolios and target asset allocation policies."
+    },
+    "/users/{userId}/portfolios/{portfolioId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/PortfolioTransaction" },
+      "description": "Append-only immutable portfolio transaction ledger entries for XIRR and FIFO tax lots."
+    },
+    "/users/{userId}/backtests/{backtestId}": {
+      "schema": { "$ref": "#/entities/SavedBacktest" },
+      "description": "Saved multi-asset backtest strategy configurations and tearsheet summary metrics."
+    },
+    "/users/{userId}/alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/PortfolioAlert" },
+      "description": "User price, drift, and tax-harvesting alerts with terminal state locking."
+    }
+  }
+}

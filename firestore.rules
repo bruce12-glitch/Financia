@@ -1,0 +1,301 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Shared hardened primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDecimal(val, maxLen) {
+      return val is string && val.size() >= 1 && val.size() <= maxLen && val.matches('^[0-9]+(\\.[0-9]{1,6})?$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidStringList(arr, maxItems) {
+      return arr is list && arr.size() <= maxItems && (arr.size() == 0 || (arr[0] is string && arr[0].size() <= 64));
+    }
+
+    // Entity validation blueprints
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'theme', 'density', 'guidanceMode', 'baseCurrency',
+          'pinnedWidgets', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'displayName', 'theme', 'density', 'guidanceMode', 'baseCurrency',
+          'pinnedWidgets', 'customMapSymbols', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.ownerId)
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100))
+        && data.theme in ['light', 'dark']
+        && data.density in ['comfortable', 'compact']
+        && data.guidanceMode in ['guided', 'pro']
+        && data.baseCurrency in ['INR', 'USD']
+        && isValidStringList(data.pinnedWidgets, 12)
+        && (!('customMapSymbols' in data) || isValidStringList(data.customMapSymbols, 40))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPortfolio(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'name', 'currency', 'targetEquityPct', 'targetDebtPct',
+          'targetGoldPct', 'driftThresholdPct', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'name', 'currency', 'targetEquityPct', 'targetDebtPct',
+          'targetGoldPct', 'driftThresholdPct', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.ownerId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.currency in ['INR', 'USD']
+        && data.targetEquityPct is number && data.targetEquityPct >= 0 && data.targetEquityPct <= 100
+        && data.targetDebtPct is number && data.targetDebtPct >= 0 && data.targetDebtPct <= 100
+        && data.targetGoldPct is number && data.targetGoldPct >= 0 && data.targetGoldPct <= 100
+        && data.driftThresholdPct is number && data.driftThresholdPct >= 1 && data.driftThresholdPct <= 50
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTransaction(data, userId, portfolioId) {
+      return data.keys().hasAll([
+          'ownerId', 'portfolioId', 'symbol', 'schemeName', 'assetClass',
+          'txType', 'tradeDate', 'units', 'price', 'amount', 'currency',
+          'source', 'idempotencyKey', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'portfolioId', 'symbol', 'schemeName', 'isin', 'assetClass',
+          'txType', 'tradeDate', 'units', 'price', 'amount', 'currency',
+          'source', 'idempotencyKey', 'createdAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.portfolioId == portfolioId
+        && isValidId(data.ownerId)
+        && isValidId(data.portfolioId)
+        && data.symbol is string && data.symbol.size() >= 1 && data.symbol.size() <= 32 && data.symbol.matches('^[A-Za-z0-9._\\-^]+$')
+        && data.schemeName is string && data.schemeName.size() >= 1 && data.schemeName.size() <= 160
+        && (!('isin' in data) || (data.isin is string && data.isin.size() <= 24))
+        && data.assetClass in ['Equity', 'Debt', 'Gold', 'Hybrid', 'Global ETF']
+        && data.txType in ['BUY', 'SELL', 'SIP', 'SWITCH_IN', 'SWITCH_OUT', 'DIVIDEND']
+        && data.tradeDate is string && data.tradeDate.size() == 10 && data.tradeDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && isValidDecimal(data.units, 24)
+        && isValidDecimal(data.price, 24)
+        && isValidDecimal(data.amount, 28)
+        && data.currency in ['INR', 'USD']
+        && data.source in ['CAS', 'CSV', 'MANUAL']
+        && data.idempotencyKey is string && data.idempotencyKey.size() >= 4 && data.idempotencyKey.size() <= 64 && data.idempotencyKey.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.createdAt is timestamp;
+    }
+
+    function isValidBacktest(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'title', 'rebalanceFrequency', 'initialCapital', 'monthlySip',
+          'horizonYears', 'benchmarkSymbol', 'allocations',
+          'summaryCagrPct', 'summarySharpe', 'summaryMaxDrawdownPct',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'title', 'rebalanceFrequency', 'initialCapital', 'monthlySip',
+          'horizonYears', 'benchmarkSymbol', 'allocations',
+          'summaryCagrPct', 'summarySharpe', 'summaryMaxDrawdownPct',
+          'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.ownerId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 100
+        && data.rebalanceFrequency in ['NONE', 'MONTHLY', 'QUARTERLY', 'ANNUAL', 'DRIFT_5PCT']
+        && isValidDecimal(data.initialCapital, 24)
+        && isValidDecimal(data.monthlySip, 24)
+        && data.horizonYears is number && data.horizonYears >= 1 && data.horizonYears <= 30
+        && data.benchmarkSymbol is string && data.benchmarkSymbol.size() >= 1 && data.benchmarkSymbol.size() <= 24
+        && data.allocations is list && data.allocations.size() >= 1 && data.allocations.size() <= 15 && data.allocations[0] is map
+        && data.summaryCagrPct is number && data.summaryCagrPct >= -100 && data.summaryCagrPct <= 500
+        && data.summarySharpe is number && data.summarySharpe >= -20 && data.summarySharpe <= 20
+        && data.summaryMaxDrawdownPct is number && data.summaryMaxDrawdownPct >= -100 && data.summaryMaxDrawdownPct <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAlert(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'symbol', 'alertType', 'targetValue', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'symbol', 'alertType', 'targetValue', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.ownerId)
+        && data.symbol is string && data.symbol.size() >= 1 && data.symbol.size() <= 32 && data.symbol.matches('^[A-Za-z0-9._\\-^]+$')
+        && data.alertType in ['PRICE_ABOVE', 'PRICE_BELOW', 'DRIFT_THRESHOLD', 'TAX_HARVEST']
+        && isValidDecimal(data.targetValue, 24)
+        && data.status in ['ACTIVE', 'TRIGGERED', 'DISMISSED']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // 1. User Workspace Profiles (Strict Owner-Only Isolation)
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName', 'theme', 'density', 'guidanceMode', 'baseCurrency',
+          'pinnedWidgets', 'customMapSymbols', 'updatedAt'
+        ]);
+      allow delete: if false;
+
+      // 2. User Portfolios
+      match /portfolios/{portfolioId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(portfolioId);
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(portfolioId)
+          && isValidPortfolio(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(portfolioId)
+          && isValidPortfolio(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'currency', 'targetEquityPct', 'targetDebtPct',
+            'targetGoldPct', 'driftThresholdPct', 'updatedAt'
+          ]);
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(portfolioId)
+          && existing().ownerId == request.auth.uid;
+
+        // 3. Immutable Portfolio Transactions (Master Gate on parent portfolio)
+        match /transactions/{transactionId} {
+          allow get: if isOwner(userId)
+            && isValidId(userId)
+            && isValidId(portfolioId)
+            && isValidId(transactionId);
+          allow list: if isOwner(userId)
+            && existing().ownerId == request.auth.uid
+            && existing().portfolioId == portfolioId;
+          allow create: if isVerifiedOwner(userId)
+            && isValidId(userId)
+            && isValidId(portfolioId)
+            && isValidId(transactionId)
+            && isValidTransaction(incoming(), userId, portfolioId)
+            && incoming().createdAt == request.time
+            && exists(/databases/$(database)/documents/users/$(userId)/portfolios/$(portfolioId))
+            && get(/databases/$(database)/documents/users/$(userId)/portfolios/$(portfolioId)).data.ownerId == request.auth.uid;
+          allow update: if false;
+          allow delete: if isVerifiedOwner(userId)
+            && isValidId(userId)
+            && isValidId(portfolioId)
+            && isValidId(transactionId)
+            && existing().ownerId == request.auth.uid
+            && exists(/databases/$(database)/documents/users/$(userId)/portfolios/$(portfolioId))
+            && get(/databases/$(database)/documents/users/$(userId)/portfolios/$(portfolioId)).data.ownerId == request.auth.uid;
+        }
+      }
+
+      // 4. Saved Multi-Asset Backtest Runs
+      match /backtests/{backtestId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(backtestId);
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(backtestId)
+          && isValidBacktest(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(backtestId)
+          && isValidBacktest(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'updatedAt']);
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(backtestId)
+          && existing().ownerId == request.auth.uid;
+      }
+
+      // 5. Price, Drift & Tax-Harvesting Alerts (Terminal State Locked)
+      match /alerts/{alertId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(alertId);
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(alertId)
+          && isValidAlert(incoming(), userId)
+          && incoming().status == 'ACTIVE'
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(alertId)
+          && isValidAlert(incoming(), userId)
+          && existing().status != 'DISMISSED'
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+            (incoming().diff(existing()).affectedKeys().hasOnly(['targetValue', 'updatedAt']))
+          );
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(alertId)
+          && existing().ownerId == request.auth.uid;
+      }
+    }
+  }
+}
