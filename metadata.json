@@ -1,6 +1,6 @@
 {
-  "name": "Financia Mutual Fund Database Engine",
-  "description": "Relational SQLite database engine, live MFPRO & AMFI NAV ingestion pipeline, portfolio holdings explorer, data quality auditor, and read-only SQL workbench for Financia.",
+  "name": "Financia — Live Stock Intelligence & Multi-Agent Equity Research",
+  "description": "Institutional-grade stock analysis platform providing live market updates, interactive real-time charts, multi-agent SEC filing insights, and a high-contrast dark intelligence dashboard.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
