@@ -306,4 +306,32 @@ export class FinanciaMutualFundDatabase {
       .prepare('SELECT * FROM scheme_holdings WHERE scheme_code = ? ORDER BY rank ASC LIMIT 25')
       .all(schemeCode) as HoldingRow[];
   }
+
+  public findSchemeByIsinOrName(isin?: string | null, schemeName?: string | null): TerminalSchemeRecord | null {
+    const cleanIsin = (isin || '').trim().toUpperCase();
+    if (cleanIsin && /^IN[A-Z0-9]{10}$/.test(cleanIsin)) {
+      const byIsin = this.db
+        .prepare('SELECT * FROM terminal_schemes WHERE UPPER(isin) = ? OR UPPER(isin2) = ? LIMIT 1')
+        .get(cleanIsin, cleanIsin) as TerminalSchemeRecord | undefined;
+      if (byIsin) return byIsin;
+    }
+
+    const cleanName = (schemeName || '').trim().toLowerCase();
+    if (cleanName.length >= 4) {
+      const tokens = cleanName
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter((t) => t.length >= 3 && !['direct', 'regular', 'growth', 'plan', 'fund', 'option', 'idcw', 'mutual'].includes(t));
+
+      if (tokens.length > 0) {
+        const primary = tokens.slice(0, 3).join('%');
+        const byTokens = this.db
+          .prepare('SELECT * FROM terminal_schemes WHERE LOWER(scheme_name) LIKE ? ORDER BY CASE WHEN plan_type = \'Direct\' THEN 0 ELSE 1 END LIMIT 1')
+          .get(`%${primary}%`) as TerminalSchemeRecord | undefined;
+        if (byTokens) return byTokens;
+      }
+    }
+
+    return null;
+  }
 }

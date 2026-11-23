@@ -10,6 +10,8 @@ export type AuditEventType =
   | 'alerts.delete'
   | 'watchlist.update'
   | 'screener.compare'
+  | 'portfolio.cas_pdf_parsed'
+  | 'portfolio.cas_pdf_error'
   | 'security.rate_limited';
 
 export interface SecurityAuditEntry {

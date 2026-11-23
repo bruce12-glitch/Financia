@@ -64,7 +64,13 @@ export function applySecurityHeaders(
   }
 
   // Prevent intermediate caching of authenticated or sensitive API responses
-  if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/alerts') || req.path.startsWith('/api/watchlist') || req.path.startsWith('/api/security')) {
+  if (
+    req.path.startsWith('/api/auth') ||
+    req.path.startsWith('/api/alerts') ||
+    req.path.startsWith('/api/watchlist') ||
+    req.path.startsWith('/api/security') ||
+    req.path.startsWith('/api/portfolio')
+  ) {
     res.setHeader('Cache-Control', 'no-store, max-age=0');
     res.setHeader('Pragma', 'no-cache');
   }

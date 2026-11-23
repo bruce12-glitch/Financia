@@ -38,6 +38,7 @@ import {
   subscribeCloudTransactions,
   updateCloudPortfolioPolicy,
 } from './portfolioRepository';
+import { CasPdfUploadCard } from './CasPdfUploadCard';
 
 interface PortfolioTrackerPageProps {
   stocks: StockQuote[];
@@ -187,9 +188,34 @@ export const PortfolioTrackerPage: React.FC<PortfolioTrackerPageProps> = ({
     [valuation.holdings]
   );
 
+  const existingIdempotencyKeys = useMemo(
+    () => new Set(transactions.map((t) => t.idempotencyKey)),
+    [transactions]
+  );
+
+  const handleCommitParsedCasTransactions = async (
+    incoming: LedgerTransaction[]
+  ): Promise<{ added: number; duplicates: number }> => {
+    const fresh = incoming.filter((t) => !existingIdempotencyKeys.has(t.idempotencyKey));
+    const duplicates = incoming.length - fresh.length;
+
+    if (fresh.length > 0) {
+      if (user && user.emailVerified) {
+        setSyncingCloud(true);
+        try {
+          await appendCloudTransactions(user.uid, fresh, DEFAULT_PORTFOLIO_ID);
+        } finally {
+          setSyncingCloud(false);
+        }
+      }
+      setTransactions((prev) => [...prev, ...fresh]);
+    }
+
+    return { added: fresh.length, duplicates };
+  };
+
   const handleIngestCsv = async (rawText: string, source: 'CAS' | 'CSV' = 'CSV') => {
-    const existingKeys = new Set(transactions.map((t) => t.idempotencyKey));
-    const parsed = parsePortfolioCsvOrCas(rawText, existingKeys, source);
+    const parsed = parsePortfolioCsvOrCas(rawText, existingIdempotencyKeys, source);
 
     if (parsed.validTransactions.length > 0) {
       if (user && user.emailVerified) {
@@ -691,9 +717,17 @@ export const PortfolioTrackerPage: React.FC<PortfolioTrackerPageProps> = ({
         </div>
       )}
 
-      {/* TAB 2: CAS / CSV Import & Manual Trade Form */}
+      {/* TAB 2: CAS PDF / CSV Import & Manual Trade Form */}
       {subTab === 'import' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div className="space-y-6 mt-6">
+          <CasPdfUploadCard
+            existingKeys={existingIdempotencyKeys}
+            syncingCloud={syncingCloud}
+            isCloudSignedIn={Boolean(user && user.emailVerified)}
+            onCommitTransactions={handleCommitParsedCasTransactions}
+          />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="rounded-[12px] border border-[#e2e8f0] dark:border-[#1f2937] bg-white dark:bg-[#111827] p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 font-display font-semibold text-base text-[#090e1a] dark:text-white">
@@ -876,6 +910,7 @@ export const PortfolioTrackerPage: React.FC<PortfolioTrackerPageProps> = ({
               Append to Immutable FIFO Ledger
             </button>
           </form>
+          </div>
         </div>
       )}
 

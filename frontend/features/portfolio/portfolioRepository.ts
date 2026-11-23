@@ -169,33 +169,40 @@ export async function appendCloudTransactions(
   await ensureCloudPortfolio(safeUid, true, safePid);
 
   try {
-    const batch = writeBatch(db);
+    const CHUNK_SIZE = 400;
+    const bounded = transactions.slice(0, 2000);
     let count = 0;
 
-    for (const tx of transactions.slice(0, 200)) {
-      const txDocId = sanitizeBlueprintId(tx.idempotencyKey, `tx_${Date.now()}_${count}`);
-      const ref = doc(db, 'users', safeUid, 'portfolios', safePid, 'transactions', txDocId);
-      batch.set(ref, {
-        ownerId: safeUid,
-        portfolioId: safePid,
-        symbol: clampString(tx.symbol.toUpperCase(), 32),
-        schemeName: clampString(tx.schemeName, 160),
-        isin: clampString(tx.isin || '', 24),
-        assetClass: tx.assetClass,
-        txType: tx.txType,
-        tradeDate: tx.tradeDate,
-        units: tx.units,
-        price: tx.price,
-        amount: tx.amount,
-        currency: tx.currency,
-        source: tx.source,
-        idempotencyKey: txDocId.slice(0, 64),
-        createdAt: serverTimestamp(),
-      });
-      count += 1;
+    for (let offset = 0; offset < bounded.length; offset += CHUNK_SIZE) {
+      const slice = bounded.slice(offset, offset + CHUNK_SIZE);
+      const batch = writeBatch(db);
+
+      for (const tx of slice) {
+        const txDocId = sanitizeBlueprintId(tx.idempotencyKey, `tx_${Date.now()}_${count}`);
+        const ref = doc(db, 'users', safeUid, 'portfolios', safePid, 'transactions', txDocId);
+        batch.set(ref, {
+          ownerId: safeUid,
+          portfolioId: safePid,
+          symbol: clampString(tx.symbol.toUpperCase(), 32),
+          schemeName: clampString(tx.schemeName, 160),
+          isin: clampString(tx.isin || '', 24),
+          assetClass: tx.assetClass,
+          txType: tx.txType,
+          tradeDate: tx.tradeDate,
+          units: tx.units,
+          price: tx.price,
+          amount: tx.amount,
+          currency: tx.currency,
+          source: tx.source,
+          idempotencyKey: txDocId.slice(0, 64),
+          createdAt: serverTimestamp(),
+        });
+        count += 1;
+      }
+
+      await batch.commit();
     }
 
-    await batch.commit();
     return count;
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, colPath);

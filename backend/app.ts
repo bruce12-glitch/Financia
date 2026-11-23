@@ -10,6 +10,7 @@ import { createMarketsRouter } from './routes/marketsRoutes.ts';
 import { createWorkspaceRouter } from './routes/workspaceRoutes.ts';
 import { createAiRouter } from './routes/aiRoutes.ts';
 import { createScreenerRouter } from './routes/screenerRoutes.ts';
+import { createCasParserRouter } from './routes/casParserRoutes.ts';
 import {
   apiErrorHandler,
   applySecurityHeaders,
@@ -161,6 +162,7 @@ export async function createBackendApp(
   app.use('/api', createScreenerRouter());
   app.use('/api', createStocksRouter(navDb, engine.mfDb));
   app.use('/api', createMarketsRouter());
+  app.use('/api/portfolio/cas', createCasParserRouter(engine.mfDb));
   app.use('/api', createWorkspaceRouter(store));
   app.use('/api', createAiRouter());
 
