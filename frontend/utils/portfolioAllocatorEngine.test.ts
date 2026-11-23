@@ -96,3 +96,120 @@ test('computeAggregatedBasketSummary and buildBulkInstrumentRows aggregate and s
   assert.ok(csv.includes('LIQUIDBEES'));
   assert.ok(csv.includes('QQQ'));
 });
+
+test('weight locking, risk parity, and low-cost optimizers preserve locks and sum strictly to 100%', async () => {
+  const {
+    computeRiskParityWeights,
+    computeLowCostIncomeWeights,
+    redistributeWeightsWithLocks,
+  } = await import('./portfolioAllocatorEngine');
+
+  const basket = SCREENER_FUNDS.filter((f) =>
+    ['PPFAS', 'NIFTYBEES', 'GOLDBEES', 'HDFCCORP'].includes(f.symbol)
+  );
+  const locked = redistributeWeightsWithLocks(
+    ['PPFAS', 'NIFTYBEES', 'GOLDBEES', 'HDFCCORP'],
+    { PPFAS: 40, NIFTYBEES: 20, GOLDBEES: 20, HDFCCORP: 20 },
+    ['PPFAS']
+  );
+  assert.equal(locked['PPFAS'], 40);
+  const lockSum = Object.values(locked).reduce((s, v) => s + v, 0);
+  assert.ok(Math.abs(lockSum - 100) < 0.15);
+
+  const rp = computeRiskParityWeights(basket, { PPFAS: 30 }, ['PPFAS']);
+  assert.equal(rp['PPFAS'], 30);
+  assert.ok(rp['HDFCCORP'] > rp['NIFTYBEES'], 'Lower-volatility debt should receive higher risk-parity weight than equity');
+
+  const lowCost = computeLowCostIncomeWeights(basket);
+  const lcSum = Object.values(lowCost).reduce((s, v) => s + v, 0);
+  assert.ok(Math.abs(lcSum - 100) < 0.15);
+});
+
+test('Step-Up SIP and inflation adjustment compute realistic real vs nominal projections', () => {
+  const basket = SCREENER_FUNDS.filter((f) => ['PPFAS', 'GOLDBEES'].includes(f.symbol));
+  const flat = buildProjectedPortfolioPerformance(
+    basket,
+    { PPFAS: 60, GOLDBEES: 40 },
+    { startingCapital: 500_000, monthlySip: 10_000, horizonYears: 10, annualSipStepUpPct: 0, inflationRatePct: 6 }
+  );
+  const stepped = buildProjectedPortfolioPerformance(
+    basket,
+    { PPFAS: 60, GOLDBEES: 40 },
+    { startingCapital: 500_000, monthlySip: 10_000, horizonYears: 10, annualSipStepUpPct: 10, inflationRatePct: 6 }
+  );
+  assert.ok(stepped.totalInvestedEnd > flat.totalInvestedEnd);
+  assert.ok(stepped.baseEndingValue > flat.baseEndingValue);
+  assert.ok(stepped.realBaseEndingValue < stepped.baseEndingValue);
+});
+
+test('allocatorLabsEngine: Monte Carlo, Look-Through Overlap, Stress Scenarios, SWP, and Fresh-Cash Rebalance', async () => {
+  const {
+    runPortfolioMonteCarlo,
+    computePortfolioLookthrough,
+    runPortfolioStressScenarios,
+    simulatePortfolioSwp,
+    computeFreshCashRebalancePlan,
+    computeTaxAwareRebalanceSummary,
+  } = await import('./allocatorLabsEngine');
+  const { computePortfolioRebalancePlan } = await import('./rebalanceEngine');
+
+  const basket = SCREENER_FUNDS.filter((f) =>
+    ['PPFAS', 'NIFTYBEES', 'GOLDBEES', 'HDFCCORP'].includes(f.symbol)
+  );
+  const weights = { PPFAS: 40, NIFTYBEES: 30, GOLDBEES: 20, HDFCCORP: 10 };
+
+  const mc = runPortfolioMonteCarlo(basket, weights, {
+    startingCapital: 500_000,
+    monthlySip: 15_000,
+    annualSipStepUpPct: 10,
+    inflationRatePct: 6,
+    horizonYears: 10,
+    targetGoal: 4_000_000,
+    pathsCount: 400,
+  });
+  assert.equal(mc.points.length, 11);
+  assert.ok(mc.p90Ending >= mc.p75Ending && mc.p75Ending >= mc.medianEnding && mc.medianEnding >= mc.p10Ending);
+  assert.ok(mc.goalSuccessProbabilityPct >= 0 && mc.goalSuccessProbabilityPct <= 100);
+
+  const lookthrough = computePortfolioLookthrough(basket, weights, 500_000);
+  assert.ok(lookthrough.assetClasses.length >= 2);
+  assert.ok(lookthrough.sectors.length >= 3);
+  assert.ok(lookthrough.topUnderlyingHoldings.length >= 5);
+  assert.ok(lookthrough.effectiveFundCount > 2.5);
+
+  const stress = runPortfolioStressScenarios(basket, weights, 500_000);
+  assert.equal(stress.length, 5);
+  assert.ok(stress[0].portfolioImpactPct < 0, '2008 GFC should be negative for equity-heavy portfolio');
+  assert.ok(stress[4].portfolioImpactPct > 0, 'Risk-on rally should be positive');
+
+  const swp = simulatePortfolioSwp({
+    startingCorpus: 10_000_000,
+    initialMonthlyWithdrawal: 45_000,
+    annualInflationPct: 5,
+    expectedReturnPct: 11,
+    horizonYears: 20,
+  });
+  assert.equal(swp.points.length, 21);
+  assert.equal(swp.survivedAllYears, true);
+  assert.ok(swp.totalWithdrawn > 10_000_000);
+
+  const driftedCurrent = { PPFAS: 260_000, NIFTYBEES: 140_000, GOLDBEES: 70_000, HDFCCORP: 30_000 };
+  const freshPlan = computeFreshCashRebalancePlan({
+    funds: basket,
+    currentValues: driftedCurrent,
+    targetWeights: weights,
+    freshCashAmount: 100_000,
+  });
+  assert.ok(freshPlan.postMaxDriftPct < freshPlan.preMaxDriftPct);
+  assert.equal(freshPlan.rows.find((r) => r.symbol === 'PPFAS')!.freshCashAllocation, 0);
+
+  const stdPlan = computePortfolioRebalancePlan({
+    funds: basket,
+    currentValues: driftedCurrent,
+    targetWeights: weights,
+  });
+  const taxInfo = computeTaxAwareRebalanceSummary(stdPlan, 'stcg', 30);
+  assert.ok(taxInfo.totalFrictionCost > 0);
+  assert.equal(taxInfo.freshCashTaxSaved, taxInfo.totalFrictionCost);
+});
+

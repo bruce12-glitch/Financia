@@ -45,9 +45,14 @@ import { TerminalBulkDataPanel } from './TerminalBulkDataPanel';
 import { TerminalIndividualAnalysisPanel } from './TerminalIndividualAnalysisPanel';
 import { TerminalCrossFundComparePanel } from './TerminalCrossFundComparePanel';
 import { TerminalCorrelationMatrix90d } from './TerminalCorrelationMatrix90d';
+import { TerminalQuantToolbox } from './TerminalQuantToolbox';
 import { SCREENER_FUNDS, ScreenerFundRecord } from '../utils/screenerEngine';
 import { getFundIntelligence, selectPeerComparisonSymbols } from '../utils/fundIntelligenceEngine';
 import { synthesizeScreenerFundFromQuote } from '../utils/rebalanceEngine';
+import {
+  evaluateTerminalAlerts,
+  TerminalPriceAlertRule,
+} from '../utils/fundTerminalToolsEngine';
 import {
   buildScreenerFundFromNavDbDetail,
   buildScreenerFundFromV1Dossier,
@@ -66,7 +71,7 @@ import {
   V1UniformFundDossier,
 } from '../services/financiaApiClient';
 
-export type TerminalTabId = 'individual' | 'compare' | 'allocator' | 'bulk' | 'chart' | 'risk';
+export type TerminalTabId = 'individual' | 'compare' | 'allocator' | 'quantlab' | 'bulk' | 'chart' | 'risk';
 
 interface LiveStockTerminalProps {
   stocks: StockQuote[];
@@ -155,6 +160,44 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
       // ignore storage errors
     }
   }, [pinnedSymbols]);
+
+  // Dedicated Terminal NAV / Drawdown Watch Alerts (LocalStorage persisted)
+  const [showTerminalAlertsDrawer, setShowTerminalAlertsDrawer] = useState<boolean>(false);
+  const [terminalAlertRules, setTerminalAlertRules] = useState<TerminalPriceAlertRule[]>(() => {
+    try {
+      const raw = window.localStorage.getItem('financia_terminal_nav_alerts_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return [
+      {
+        id: 'seed-alert-1',
+        symbol: 'PPFAS',
+        condition: 'below',
+        threshold: 80,
+        note: 'Core flexi-cap dip accumulation zone',
+        createdAt: '2026-11-23',
+      },
+    ];
+  });
+  const [newAlertCondition, setNewAlertCondition] = useState<'above' | 'below' | 'drop_pct'>('above');
+  const [newAlertThreshold, setNewAlertThreshold] = useState<string>('');
+  const [newAlertNote, setNewAlertNote] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        'financia_terminal_nav_alerts_v1',
+        JSON.stringify(terminalAlertRules)
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [terminalAlertRules]);
 
   // Preload SQLite nav_master schemes + 14k AMFI SQLite database stats on mount
   useEffect(() => {
@@ -1188,13 +1231,13 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                     );
                   }
                 }}
-                className={`px-3 py-1.5 rounded-[7px] text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-2.5 py-1.5 rounded-[7px] text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                   analysisMode === 'multi'
                     ? 'bg-[#2563eb] text-white'
                     : 'text-[#475569] hover:text-[#0f172a]'
                 }`}
               >
-                Multi-Instrument Compare (2–4)
+                Compare (2–4)
               </button>
             </div>
 
@@ -1202,10 +1245,10 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
               type="button"
               data-testid="toggle-watchlist-drawer"
               onClick={() => setShowWatchlistDrawer((prev) => !prev)}
-              className="h-8 px-3 rounded-[8px] border border-[#cbd5e1] bg-[#f8fafc] hover:bg-white text-xs font-semibold text-[#334155] hover:text-[#0f172a] inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              className="h-8 px-2.5 rounded-[8px] border border-[#cbd5e1] bg-[#f8fafc] hover:bg-white text-xs font-semibold text-[#334155] hover:text-[#0f172a] inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
               <List className="w-3.5 h-3.5 text-[#2563eb]" />
-              <span>{showWatchlistDrawer ? 'Hide Live Watchlist' : `Live Watchlist (${stocks.length})`}</span>
+              <span>{showWatchlistDrawer ? 'Hide Watchlist' : `Watchlist (${stocks.length})`}</span>
             </button>
 
             <button
@@ -1219,16 +1262,35 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 60);
               }}
-              className="h-8 px-3 rounded-[8px] border border-[#bfdbfe] bg-[#eff6ff] hover:bg-[#dbeafe] text-xs font-semibold text-[#1d4ed8] inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              className="h-8 px-2.5 rounded-[8px] border border-[#bfdbfe] bg-[#eff6ff] hover:bg-[#dbeafe] text-xs font-semibold text-[#1d4ed8] inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
               <Activity className="w-3.5 h-3.5" />
-              <span>90D Correlation Matrix</span>
+              <span>90D Correlation</span>
+            </button>
+
+            <button
+              type="button"
+              data-testid="terminal-toggle-alerts-btn"
+              onClick={() => {
+                setShowTerminalAlertsDrawer((prev) => !prev);
+                if (!newAlertThreshold && activeStock.price > 0) {
+                  setNewAlertThreshold(String(Number((activeStock.price * 1.03).toFixed(2))));
+                }
+              }}
+              className={`h-8 px-2.5 rounded-[8px] border text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap transition-colors ${
+                showTerminalAlertsDrawer
+                  ? 'bg-[#0f172a] text-white border-[#0f172a]'
+                  : 'border-[#fde68a] bg-[#fffbeb] hover:bg-[#fef3c7] text-[#92400e]'
+              }`}
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span>NAV Alerts ({terminalAlertRules.length})</span>
             </button>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
             <label htmlFor="terminal-all-20-select" className="text-xs font-medium text-[#475569] whitespace-nowrap">
-              Active Instrument:
+              Active:
             </label>
             <select
               id="terminal-all-20-select"
@@ -1243,7 +1305,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                 if (!e.target.value) return;
                 onAnalyzeCustomTicker(e.target.value, agentMode);
               }}
-              className="h-9 rounded-[8px] border border-[#cbd5e1] bg-[#f8fafc] px-3 text-xs font-semibold text-[#0f172a] focus:outline-none focus:border-[#2563eb] cursor-pointer max-w-[310px]"
+              className="h-9 rounded-[8px] border border-[#cbd5e1] bg-[#f8fafc] px-2.5 text-xs font-semibold text-[#0f172a] focus:outline-none focus:border-[#2563eb] cursor-pointer max-w-[260px]"
             >
               {!SCREENER_FUNDS.some((f) => f.symbol === activeStock.ticker) &&
                 !navDbSchemes.some((s) => String(s.scheme_code) === activeStock.ticker) && (
@@ -1271,7 +1333,154 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
           </div>
         </div>
 
-        {/* Terminal Workspace Tab Bar (6 Focused Institutional Views on One Clean Row) */}
+        {/* Dedicated Terminal NAV / Drawdown Watch Alerts Drawer */}
+        {showTerminalAlertsDrawer && (() => {
+          const quotesMap: Record<string, { price: number; changePct: number }> = {};
+          for (const s of stocks) {
+            quotesMap[s.ticker.toUpperCase()] = { price: s.price, changePct: s.changePercent };
+          }
+          for (const f of SCREENER_FUNDS) {
+            if (!quotesMap[f.symbol.toUpperCase()]) {
+              quotesMap[f.symbol.toUpperCase()] = { price: f.price, changePct: f.changePct };
+            }
+          }
+          quotesMap[activeStock.ticker.toUpperCase()] = {
+            price: activeStock.price,
+            changePct: activeStock.changePercent,
+          };
+          const evaluatedAlerts = evaluateTerminalAlerts(terminalAlertRules, quotesMap);
+
+          return (
+            <div
+              data-testid="terminal-alerts-drawer"
+              className="mb-5 rounded-[12px] bg-white border border-[#fde68a] p-4 space-y-3 shadow-xs"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-[#f1f5f9]">
+                <div>
+                  <div className="text-[11px] font-mono uppercase tracking-[0.07em] text-[#b45309] font-semibold">
+                    Live NAV &amp; Drawdown Watchlist Triggers — Active: {activeStock.ticker} ({formatCurrency(activeStock.price)})
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTerminalAlertsDrawer(false)}
+                  className="text-xs font-medium text-[#64748b] hover:text-[#0f172a] cursor-pointer"
+                >
+                  Close Alerts
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const thresholdNum = Number(newAlertThreshold);
+                  if (!Number.isFinite(thresholdNum) || thresholdNum <= 0) return;
+                  const nextRule: TerminalPriceAlertRule = {
+                    id: `alert-${Date.now()}`,
+                    symbol: activeStock.ticker.toUpperCase(),
+                    condition: newAlertCondition,
+                    threshold: thresholdNum,
+                    note: newAlertNote.trim() || `${activeStock.ticker} watch rule`,
+                    createdAt: new Date().toISOString().slice(0, 10),
+                  };
+                  setTerminalAlertRules((prev) => [nextRule, ...prev].slice(0, 12));
+                  setNewAlertNote('');
+                }}
+                className="flex flex-wrap items-center gap-2"
+              >
+                <span className="font-mono text-xs font-bold text-[#0f172a] px-2 py-1 rounded bg-[#f1f5f9]">
+                  {activeStock.ticker}
+                </span>
+                <select
+                  aria-label="Alert trigger condition"
+                  data-testid="terminal-alert-condition-select"
+                  value={newAlertCondition}
+                  onChange={(e) => setNewAlertCondition(e.target.value as 'above' | 'below' | 'drop_pct')}
+                  className="h-8 rounded-[7px] border border-[#cbd5e1] bg-white px-2.5 text-xs font-medium text-[#0f172a]"
+                >
+                  <option value="above">NAV / Price Above</option>
+                  <option value="below">NAV / Price Below</option>
+                  <option value="drop_pct">Intraday Drop ≥ %</option>
+                </select>
+                <input
+                  type="number"
+                  step="any"
+                  aria-label="Alert threshold value"
+                  data-testid="terminal-alert-threshold-input"
+                  value={newAlertThreshold}
+                  onChange={(e) => setNewAlertThreshold(e.target.value)}
+                  placeholder={newAlertCondition === 'drop_pct' ? '2.5' : String(activeStock.price.toFixed(2))}
+                  className="w-28 h-8 px-2.5 rounded-[7px] border border-[#cbd5e1] bg-white text-right font-mono text-xs font-semibold text-[#0f172a] tabular-nums"
+                />
+                <input
+                  type="text"
+                  aria-label="Alert note"
+                  data-testid="terminal-alert-note-input"
+                  value={newAlertNote}
+                  onChange={(e) => setNewAlertNote(e.target.value)}
+                  placeholder="Optional note (e.g., Add lump sum)"
+                  className="flex-1 min-w-[160px] h-8 px-2.5 rounded-[7px] border border-[#cbd5e1] bg-white text-xs text-[#0f172a]"
+                />
+                <button
+                  type="submit"
+                  data-testid="terminal-alert-add-submit"
+                  className="h-8 px-3.5 rounded-[7px] bg-[#0f172a] hover:bg-[#1e293b] text-white text-xs font-semibold cursor-pointer whitespace-nowrap"
+                >
+                  Add Watch Alert
+                </button>
+              </form>
+
+              {evaluatedAlerts.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {evaluatedAlerts.map((al) => (
+                    <div
+                      key={al.id}
+                      data-testid={`terminal-alert-item-${al.symbol}`}
+                      className={`rounded-[8px] border px-3 py-2 flex items-center justify-between gap-2 text-xs ${
+                        al.triggered
+                          ? 'border-[#86efac] bg-[#ecfdf5]/70'
+                          : 'border-[#e2e8f0] bg-[#f8fafc]'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 font-mono">
+                          <strong className="text-[#0f172a]">{al.symbol}</strong>
+                          <span className="text-[#475569]">
+                            {al.condition === 'above'
+                              ? `≥ ${al.threshold}`
+                              : al.condition === 'below'
+                                ? `≤ ${al.threshold}`
+                                : `Drop ≥ ${al.threshold}%`}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-[#64748b] truncate">{al.note}</div>
+                        <div
+                          className={`text-[10.5px] font-mono font-semibold mt-0.5 ${
+                            al.triggered ? 'text-[#047857]' : 'text-[#475569]'
+                          }`}
+                        >
+                          {al.statusLabel}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={`Remove alert for ${al.symbol}`}
+                        onClick={() =>
+                          setTerminalAlertRules((prev) => prev.filter((r) => r.id !== al.id))
+                        }
+                        className="p-1 text-[#94a3b8] hover:text-[#dc2626] cursor-pointer shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Terminal Workspace Tab Bar (7 Focused Institutional Views on One Clean Row) */}
         <div
           data-testid="terminal-tab-bar"
           role="tablist"
@@ -1282,39 +1491,45 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
             [
               {
                 id: 'individual',
-                label: 'Individual Analysis',
+                label: 'Individual',
                 icon: PieChart,
-                badge: '16 Modules',
+                badge: '16 Mod',
               },
               {
                 id: 'compare',
-                label: 'Compare Two Funds',
+                label: 'Compare',
                 icon: GitCompare,
-                badge: 'Any vs Any',
+                badge: '2–4',
               },
               {
                 id: 'allocator',
                 label: 'Portfolio Allocator',
                 icon: Layers,
-                badge: 'Rebalance',
+                badge: 'Labs',
+              },
+              {
+                id: 'quantlab',
+                label: 'Quant & SIP Lab',
+                icon: Sparkles,
+                badge: 'Tax',
               },
               {
                 id: 'bulk',
-                label: 'Bulk Data View',
+                label: 'Bulk Data',
                 icon: Table2,
                 badge: `${SCREENER_FUNDS.length + navDbSchemes.length}`,
               },
               {
                 id: 'chart',
-                label: 'Chart & Technicals',
+                label: 'Charts & RSI',
                 icon: BarChart3,
-                badge: 'RSI',
+                badge: 'Tech',
               },
               {
                 id: 'risk',
-                label: 'Risk, VaR & Filings',
+                label: 'Risk & VaR',
                 icon: ShieldAlert,
-                badge: 'VaR',
+                badge: 'Filings',
               },
             ] as const
           ).map((tab) => {
@@ -1340,7 +1555,7 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
                     );
                   }
                 }}
-                className={`h-9 px-3 rounded-[9px] border text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`h-9 px-2.5 rounded-[9px] border text-[11.5px] font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   active
                     ? 'bg-[#0f172a] text-white border-[#0f172a] shadow-xs'
                     : 'bg-white text-[#475569] border-[#cbd5e1] hover:border-[#2563eb] hover:text-[#0f172a]'
@@ -1980,6 +2195,22 @@ export const LiveStockTerminal: React.FC<LiveStockTerminalProps> = ({
             }}
           />
         )}
+
+        {/* TAB 4: DEDICATED FUND QUANT & SIP LAB (PEER PERCENTILES, ROLLING RETURNS, SIP VS LUMPSUM, POST-TAX REDEMPTION) */}
+        {terminalTab === 'quantlab' && (() => {
+          const matchedFund =
+            hydratedFundsBySymbol[activeStock.ticker.toUpperCase()] ||
+            SCREENER_FUNDS.find(
+              (f) => f.symbol.toUpperCase() === activeStock.ticker.toUpperCase()
+            ) ||
+            synthesizeScreenerFundFromQuote(activeStock);
+          return (
+            <TerminalQuantToolbox
+              activeFund={matchedFund}
+              onSendToAllocator={() => setTerminalTab('allocator')}
+            />
+          );
+        })()}
 
         {/* TAB 4: FULL-UNIVERSE BULK DATA VIEW */}
         {terminalTab === 'bulk' && (

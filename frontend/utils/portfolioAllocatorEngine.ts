@@ -39,6 +39,7 @@ export interface ProjectedPerformancePoint {
   yearLabel: string;
   totalInvested: number;
   baseValue: number;
+  realBaseValue: number;
   bullValue: number;
   bearValue: number;
   [symbolKey: string]: number | string;
@@ -47,6 +48,8 @@ export interface ProjectedPerformancePoint {
 export interface ProjectedPortfolioSummary {
   startingCapital: number;
   monthlySip: number;
+  annualSipStepUpPct: number;
+  inflationRatePct: number;
   horizonYears: number;
   totalInvestedEnd: number;
   weightedHistoricalCagrPct: number;
@@ -58,6 +61,7 @@ export interface ProjectedPortfolioSummary {
   portfolioMaxDrawdownEstPct: number;
   portfolioSharpe3Y: number;
   baseEndingValue: number;
+  realBaseEndingValue: number;
   bullEndingValue: number;
   bearEndingValue: number;
   baseGainPct: number;
@@ -185,6 +189,116 @@ export function normalizeAllocationWeights(
 }
 
 /**
+ * Respects locked symbols (keeping their exact weights) while distributing remaining %
+ * proportionally across unlocked symbols so the full basket sums to 100.0%.
+ */
+export function redistributeWeightsWithLocks(
+  symbols: string[],
+  rawWeights: Record<string, number>,
+  lockedSymbols: string[]
+): Record<string, number> {
+  if (symbols.length === 0) return {};
+  const lockedSet = new Set(lockedSymbols.filter((s) => symbols.includes(s)));
+  if (lockedSet.size === 0 || lockedSet.size >= symbols.length) {
+    return normalizeAllocationWeights(symbols, rawWeights);
+  }
+
+  const out: Record<string, number> = {};
+  let lockedTotal = 0;
+  for (const s of symbols) {
+    if (lockedSet.has(s)) {
+      const clamped = Math.min(100, Math.max(0, Number(rawWeights[s]) || 0));
+      out[s] = Number(clamped.toFixed(1));
+      lockedTotal += out[s];
+    }
+  }
+
+  if (lockedTotal >= 100) {
+    // Scale locked weights down to 100 and zero out unlocked
+    const scaledLocked = normalizeAllocationWeights(Array.from(lockedSet), out);
+    for (const s of symbols) {
+      out[s] = lockedSet.has(s) ? scaledLocked[s] : 0;
+    }
+    return out;
+  }
+
+  const remaining = Number(Math.max(0, 100 - lockedTotal).toFixed(1));
+  const unlocked = symbols.filter((s) => !lockedSet.has(s));
+  const unlockedNorm = normalizeAllocationWeights(unlocked, rawWeights);
+
+  let acc = 0;
+  unlocked.forEach((s, idx) => {
+    if (idx === unlocked.length - 1) {
+      out[s] = Number(Math.max(0, remaining - acc).toFixed(1));
+    } else {
+      const val = Number(((unlockedNorm[s] / 100) * remaining).toFixed(1));
+      out[s] = val;
+      acc += val;
+    }
+  });
+  return out;
+}
+
+/**
+ * Computes inverse-volatility Risk Parity weights summing to 100% (optionally preserving locked weights).
+ */
+export function computeRiskParityWeights(
+  funds: ScreenerFundRecord[],
+  lockedWeights: Record<string, number> = {},
+  lockedSymbols: string[] = []
+): Record<string, number> {
+  if (funds.length === 0) return {};
+  if (funds.length === 1) return { [funds[0].symbol]: 100 };
+
+  const invVolMap: Record<string, number> = {};
+  for (const f of funds) {
+    const intel = getFundIntelligence(f);
+    const vol = Math.max(1.2, intel.ratios.stdDev3Y);
+    invVolMap[f.symbol] = 1 / vol;
+  }
+
+  const symbols = funds.map((f) => f.symbol);
+  if (lockedSymbols.length > 0) {
+    const merged: Record<string, number> = { ...invVolMap };
+    for (const s of lockedSymbols) {
+      if (typeof lockedWeights[s] === 'number') merged[s] = lockedWeights[s];
+    }
+    return redistributeWeightsWithLocks(symbols, merged, lockedSymbols);
+  }
+
+  return normalizeAllocationWeights(symbols, invVolMap);
+}
+
+/**
+ * Computes Low-Cost & Yield-Tilted weights favoring lowest TER and positive dividend carry.
+ */
+export function computeLowCostIncomeWeights(
+  funds: ScreenerFundRecord[],
+  lockedWeights: Record<string, number> = {},
+  lockedSymbols: string[] = []
+): Record<string, number> {
+  if (funds.length === 0) return {};
+  if (funds.length === 1) return { [funds[0].symbol]: 100 };
+
+  const scoreMap: Record<string, number> = {};
+  for (const f of funds) {
+    const costScore = 1 / Math.max(0.08, f.about.expenseRatioPct + 0.12);
+    const yieldBoost = 1 + Math.max(0, f.keyStats.dividendYieldPct) * 0.25;
+    scoreMap[f.symbol] = costScore * yieldBoost;
+  }
+
+  const symbols = funds.map((f) => f.symbol);
+  if (lockedSymbols.length > 0) {
+    const merged: Record<string, number> = { ...scoreMap };
+    for (const s of lockedSymbols) {
+      if (typeof lockedWeights[s] === 'number') merged[s] = lockedWeights[s];
+    }
+    return redistributeWeightsWithLocks(symbols, merged, lockedSymbols);
+  }
+  return normalizeAllocationWeights(symbols, scoreMap);
+}
+
+/**
  * Computes covariance-aware Max-Sharpe allocation weights summing to 100%.
  */
 export function computeMaxSharpeWeights(funds: ScreenerFundRecord[]): Record<string, number> {
@@ -288,7 +402,6 @@ export function buildHistoricalPortfolioReplay(
   const normWeights = normalizeAllocationWeights(symbols, rawWeights);
   const monthlyMaps = funds.map((f) => extractMonthlyMap(f));
 
-  // Intersect shared historical periods chronologically (fallback to union if sparse)
   const keySets = monthlyMaps.map((m) => new Set(m.keys()));
   let sharedKeys = Array.from(keySets[0]).filter((k) => keySets.every((s) => s.has(k)));
   if (sharedKeys.length < 6) {
@@ -308,7 +421,6 @@ export function buildHistoricalPortfolioReplay(
     fundIdx[s] = 100;
   });
 
-  // Anchor point (Start = 100)
   const startRow: HistoricalReplayPoint = {
     periodKey: 'START',
     label: 'Start',
@@ -377,20 +489,33 @@ export function buildHistoricalPortfolioReplay(
   };
 }
 
-function compoundWithSip(principal: number, monthlySip: number, annualRateDecimal: number, years: number): number {
-  if (years <= 0) return principal;
+function compoundWithStepUpSip(
+  principal: number,
+  monthlySip: number,
+  annualRateDecimal: number,
+  years: number,
+  annualSipStepUpPct: number = 0
+): { endingValue: number; totalInvested: number } {
+  if (years <= 0) return { endingValue: principal, totalInvested: principal };
   const months = Math.round(years * 12);
   const rMonth = Math.pow(1 + Math.max(-0.5, annualRateDecimal), 1 / 12) - 1;
+  const stepFactor = 1 + Math.max(0, Math.min(50, annualSipStepUpPct)) / 100;
   let bal = principal;
+  let invested = principal;
+  let curSip = monthlySip;
   for (let m = 0; m < months; m++) {
-    bal = bal * (1 + rMonth) + monthlySip;
+    if (m > 0 && m % 12 === 0) {
+      curSip = curSip * stepFactor;
+    }
+    bal = bal * (1 + rMonth) + curSip;
+    invested += curSip;
   }
-  return Math.max(0, bal);
+  return { endingValue: Math.max(0, bal), totalInvested: invested };
 }
 
 /**
- * Projects custom-allocated portfolio performance forward (Base / Bull / Bear cones + individual funds)
- * based directly on historical 3Y annualized returns, Direct TER drag, and covariance-adjusted volatility.
+ * Projects custom-allocated portfolio performance forward (Base / Bull / Bear cones + real inflation-adjusted curve)
+ * based directly on historical 3Y annualized returns, Direct TER drag, annual SIP step-up, and covariance-adjusted volatility.
  */
 export function buildProjectedPortfolioPerformance(
   funds: ScreenerFundRecord[],
@@ -399,11 +524,15 @@ export function buildProjectedPortfolioPerformance(
     startingCapital: number;
     monthlySip: number;
     horizonYears: number;
+    annualSipStepUpPct?: number;
+    inflationRatePct?: number;
   }
 ): ProjectedPortfolioSummary {
   const safeCapital = Math.max(1000, options.startingCapital);
   const safeSip = Math.max(0, options.monthlySip);
   const safeYears = Math.max(1, Math.min(25, Math.round(options.horizonYears)));
+  const stepUpPct = Math.max(0, Math.min(40, options.annualSipStepUpPct ?? 0));
+  const inflationPct = Math.max(0, Math.min(15, options.inflationRatePct ?? 0));
 
   const symbols = funds.map((f) => f.symbol);
   const normWeights = normalizeAllocationWeights(symbols, rawWeights);
@@ -417,21 +546,31 @@ export function buildProjectedPortfolioPerformance(
   const points: ProjectedPerformancePoint[] = [];
 
   for (let y = 0; y <= safeYears; y++) {
-    const invested = Math.round(safeCapital + safeSip * 12 * y);
-    const baseVal = Math.round(compoundWithSip(safeCapital, safeSip, netRate, y));
-    // Volatility cone widens with sqrt(t) -> effective annualized drift spread ~ ±0.65 * sigma / sqrt(t)
+    const baseSim = compoundWithStepUpSip(safeCapital, safeSip, netRate, y, stepUpPct);
+    const invested = Math.round(baseSim.totalInvested);
+    const baseVal = Math.round(baseSim.endingValue);
+    const inflationDeflator = Math.pow(1 + inflationPct / 100, y);
+    const realBaseVal = Math.round(baseVal / inflationDeflator);
+
     const driftSpread = y === 0 ? 0 : (0.65 * volDecimal) / Math.sqrt(y);
     const bullRate = netRate + driftSpread;
     const bearRate = Math.max(-0.18, netRate - driftSpread);
 
-    const bullVal = y === 0 ? Math.round(safeCapital) : Math.max(baseVal, Math.round(compoundWithSip(safeCapital, safeSip, bullRate, y)));
-    const bearVal = y === 0 ? Math.round(safeCapital) : Math.min(baseVal, Math.round(compoundWithSip(safeCapital, safeSip, bearRate, y)));
+    const bullVal =
+      y === 0
+        ? Math.round(safeCapital)
+        : Math.max(baseVal, Math.round(compoundWithStepUpSip(safeCapital, safeSip, bullRate, y, stepUpPct).endingValue));
+    const bearVal =
+      y === 0
+        ? Math.round(safeCapital)
+        : Math.min(baseVal, Math.round(compoundWithStepUpSip(safeCapital, safeSip, bearRate, y, stepUpPct).endingValue));
 
     const row: ProjectedPerformancePoint = {
       year: y,
       yearLabel: y === 0 ? 'Now' : `Yr ${y}`,
       totalInvested: invested,
       baseValue: baseVal,
+      realBaseValue: realBaseVal,
       bullValue: bullVal,
       bearValue: bearVal,
     };
@@ -439,14 +578,14 @@ export function buildProjectedPortfolioPerformance(
     for (const f of funds) {
       const intel = getFundIntelligence(f);
       const fNet = (intel.returnOnAverage.avgAnnualReturn3Y - f.about.expenseRatioPct) / 100;
-      row[f.symbol] = Math.round(compoundWithSip(safeCapital, safeSip, fNet, y));
+      row[f.symbol] = Math.round(compoundWithStepUpSip(safeCapital, safeSip, fNet, y, stepUpPct).endingValue);
     }
 
     points.push(row);
   }
 
   const last = points[points.length - 1];
-  const grossEnd = Math.round(compoundWithSip(safeCapital, safeSip, grossRate, safeYears));
+  const grossEnd = Math.round(compoundWithStepUpSip(safeCapital, safeSip, grossRate, safeYears, stepUpPct).endingValue);
   const feeDrag = Math.max(0, grossEnd - last.baseValue);
   const baseGainPct = last.totalInvested > 0
     ? Number((((last.baseValue - last.totalInvested) / last.totalInvested) * 100).toFixed(1))
@@ -455,6 +594,8 @@ export function buildProjectedPortfolioPerformance(
   return {
     startingCapital: safeCapital,
     monthlySip: safeSip,
+    annualSipStepUpPct: stepUpPct,
+    inflationRatePct: inflationPct,
     horizonYears: safeYears,
     totalInvestedEnd: last.totalInvested,
     weightedHistoricalCagrPct: blended.blendedReturn3YPct,
@@ -466,6 +607,7 @@ export function buildProjectedPortfolioPerformance(
     portfolioMaxDrawdownEstPct: blended.blendedMaxDrawdownPct,
     portfolioSharpe3Y: blended.blendedSharpe3Y,
     baseEndingValue: last.baseValue,
+    realBaseEndingValue: last.realBaseValue,
     bullEndingValue: last.bullValue,
     bearEndingValue: last.bearValue,
     baseGainPct,
