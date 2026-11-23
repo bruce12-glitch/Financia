@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
-import { SCREENER_FUNDS } from '../frontend/utils/screenerEngine.ts';
+import { SCREENER_FUNDS } from '../../frontend/utils/screenerEngine.ts';
 
 export interface TerminalSchemeRecord {
   scheme_code: string;

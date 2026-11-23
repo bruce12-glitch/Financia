@@ -20,15 +20,15 @@ import {
 import { securityAuditLog } from './services/auditLogService.ts';
 import { financiaStore, PersistenceStore } from './services/persistenceService.ts';
 import { initNavDatabase, NavDatabaseService } from './services/navDatabaseService.ts';
-import { FinanciaMutualFundDatabase } from '../server/database.ts';
-import { DatasetSyncService } from '../server/syncService.ts';
-import { FinnhubService } from '../server/finnhubService.ts';
+import { FinanciaMutualFundDatabase } from './catalog/database.ts';
+import { DatasetSyncService } from './catalog/syncService.ts';
+import { FinnhubService } from './catalog/finnhubService.ts';
 import {
   createDatabaseRouter,
   createGlobalExchangeRouter,
   loadDefaultTerminalCatalogIfPresent,
-} from '../server/routes.ts';
-import { createV1Router } from '../server/v1Routes.ts';
+} from './catalog/routes.ts';
+import { createV1Router } from './catalog/v1Routes.ts';
 
 dotenv.config();
 

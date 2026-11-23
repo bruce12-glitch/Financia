@@ -43,8 +43,8 @@ import {
   searchApiNinjasEtfs,
 } from '../services/etfFmpService.ts';
 import { getNavDatabase, NavDatabaseService } from '../services/navDatabaseService.ts';
-import { FinanciaMutualFundDatabase } from '../../server/database.ts';
-import { buildUniformFundDossier } from '../../server/v1Routes.ts';
+import { FinanciaMutualFundDatabase } from '../catalog/database.ts';
+import { buildUniformFundDossier } from '../catalog/v1Routes.ts';
 
 const VALID_TIMEFRAMES = new Set(['1D', '1W', '1M', '4M', '1Y']);
 type SupportedTimeframe = '1D' | '1W' | '1M' | '4M' | '1Y';

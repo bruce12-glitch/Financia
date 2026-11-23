@@ -1,5 +1,5 @@
-import { marketApiGateway } from '../backend/services/apiGatewayCache.ts';
-import { SCREENER_FUNDS } from '../frontend/utils/screenerEngine.ts';
+import { marketApiGateway } from '../services/apiGatewayCache.ts';
+import { SCREENER_FUNDS } from '../../frontend/utils/screenerEngine.ts';
 
 export interface GlobalDossierResponse {
   instrument: {

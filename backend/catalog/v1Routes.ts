@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { marketApiGateway } from '../backend/services/apiGatewayCache.ts';
-import { NavDatabaseService } from '../backend/services/navDatabaseService.ts';
+import { marketApiGateway } from '../services/apiGatewayCache.ts';
+import { NavDatabaseService } from '../services/navDatabaseService.ts';
 import { FinanciaMutualFundDatabase, TerminalSchemeRecord } from './database.ts';
 
 export interface UniformFundHolding {

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { marketApiGateway } from '../backend/services/apiGatewayCache.ts';
+import { marketApiGateway } from '../services/apiGatewayCache.ts';
 import { FinanciaMutualFundDatabase } from './database.ts';
 import { FinnhubService } from './finnhubService.ts';
 import { AmfiSyncAudit, DatasetSyncService } from './syncService.ts';

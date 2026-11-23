@@ -1,4 +1,4 @@
-import { marketApiGateway } from '../backend/services/apiGatewayCache.ts';
+import { marketApiGateway } from '../services/apiGatewayCache.ts';
 import { FinanciaMutualFundDatabase, TerminalSchemeRecord } from './database.ts';
 
 export interface AmfiSyncAudit {

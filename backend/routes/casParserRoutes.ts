@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import express, { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import { FinanciaMutualFundDatabase } from '../../server/database.ts';
+import { FinanciaMutualFundDatabase } from '../catalog/database.ts';
 import { createRateLimiter, extractClientIp } from '../middleware/securityMiddleware.ts';
 import { securityAuditLog } from '../services/auditLogService.ts';
 import {
