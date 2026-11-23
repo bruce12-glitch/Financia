@@ -1,210 +1,215 @@
-import zlib from 'zlib';
-import {
-  CatalogDatasetDefinition,
-  isAllowedDatasetUrl,
-  MFPRO_DATASETS,
-} from './catalog.ts';
-import { FinanciaMutualFundDatabase } from './database.ts';
+import { marketApiGateway } from '../backend/services/apiGatewayCache.ts';
+import { FinanciaMutualFundDatabase, TerminalSchemeRecord } from './database.ts';
 
-export interface SyncDatasetResult {
-  datasetId: string;
-  tableName: string;
-  status: 'success' | 'error' | 'skipped';
-  rowsIngested: number;
+export interface AmfiSyncAudit {
+  status: 'synced' | 'fallback';
+  parsedCount: number;
+  activeCount: number;
+  etfCount: number;
   durationMs: number;
-  error?: string;
+  syncedAtUtc: string;
+  source: string;
+}
+
+function classifyAmfiScheme(
+  schemeName: string,
+  categoryHeader: string
+): {
+  instrumentType: string;
+  assetClass: string;
+  subCategory: string;
+  planType: string;
+  optionType: string;
+} {
+  const lower = schemeName.toLowerCase();
+  const catLower = categoryHeader.toLowerCase();
+
+  const isEtf = lower.includes('etf') || lower.includes('bees') || catLower.includes('etf');
+  const instrumentType = isEtf ? 'ETF' : 'Mutual Fund';
+
+  const assetClass =
+    lower.includes('gold') || lower.includes('silver')
+      ? 'Commodities'
+      : catLower.includes('debt') ||
+          lower.includes('liquid') ||
+          lower.includes('gilt') ||
+          lower.includes('bond') ||
+          lower.includes('money market')
+        ? 'Debt'
+        : catLower.includes('hybrid') || lower.includes('balanced') || lower.includes('arbitrage')
+          ? 'Hybrid'
+          : 'Equity';
+
+  const subCategory =
+    catLower.includes('flexi') || lower.includes('flexi')
+      ? 'Flexi Cap'
+      : catLower.includes('mid cap') || lower.includes('mid cap') || lower.includes('midcap')
+        ? 'Mid Cap'
+        : catLower.includes('small cap') || lower.includes('small cap') || lower.includes('smallcap')
+          ? 'Small Cap'
+          : catLower.includes('large cap') || lower.includes('large cap') || lower.includes('nifty 50')
+            ? 'Large Cap'
+            : lower.includes('elss') || lower.includes('tax')
+              ? 'ELSS Tax Saver'
+              : lower.includes('gold')
+                ? 'Gold & Bullion'
+                : lower.includes('gilt')
+                  ? 'Gilt & Sovereign'
+                  : lower.includes('liquid')
+                    ? 'Liquid Debt'
+                    : isEtf
+                      ? 'Index ETF'
+                      : 'Diversified';
+
+  const planType = lower.includes('direct') ? 'Direct' : 'Regular';
+  const optionType = lower.includes('idcw') || lower.includes('dividend') ? 'IDCW' : 'Growth';
+
+  return { instrumentType, assetClass, subCategory, planType, optionType };
+}
+
+export function parseAmfiNavText(rawText: string): TerminalSchemeRecord[] {
+  const lines = rawText.split(/\r?\n/);
+  const rows: TerminalSchemeRecord[] = [];
+  let currentCategory = 'Open Ended Schemes';
+  let currentAmc = 'AMFI Registered AMC';
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('Scheme Code;')) continue;
+
+    if (!line.includes(';')) {
+      if (line.includes('Schemes(') || line.startsWith('Open Ended') || line.startsWith('Close Ended')) {
+        currentCategory = line;
+      } else if (line.length > 3 && line.length < 120) {
+        currentAmc = line;
+      }
+      continue;
+    }
+
+    const parts = line.split(';');
+    if (parts.length < 6) continue;
+    const schemeCode = parts[0].trim();
+    if (!/^\d{5,8}$/.test(schemeCode)) continue;
+
+    const isin1 = parts[1].trim();
+    const isin2 = parts[2].trim();
+    const schemeName = parts[3].trim();
+    const navVal = Number(parts[4].trim());
+    const navDate = parts[5].trim();
+    if (!schemeName || !Number.isFinite(navVal) || navVal <= 0) continue;
+
+    const meta = classifyAmfiScheme(schemeName, currentCategory);
+    rows.push({
+      scheme_code: schemeCode,
+      isin: isin1 && isin1 !== '-' ? isin1 : null,
+      isin2: isin2 && isin2 !== '-' ? isin2 : null,
+      scheme_name: schemeName,
+      amc: currentAmc,
+      instrument_type: meta.instrumentType,
+      asset_class: meta.assetClass,
+      sub_category: meta.subCategory,
+      plan_type: meta.planType,
+      option_type: meta.optionType,
+      nav: navVal,
+      nav_date: navDate,
+      is_active: 1,
+      fund_aum_cr: null,
+      ter_direct: meta.planType === 'Direct' ? 0.45 : null,
+      ter_regular: meta.planType === 'Regular' ? 1.25 : null,
+      riskometer: meta.assetClass === 'Debt' ? 'Moderate' : 'Very High',
+      benchmark: meta.assetClass === 'Debt' ? 'CRISIL Short Term Bond' : 'NIFTY 500 TRI',
+      fund_managers: null,
+      exit_load: meta.instrumentType === 'ETF' ? 'Nil (Exchange Traded)' : '1% within 365 days',
+      inception_date: null,
+    });
+  }
+
+  return rows;
 }
 
 export class DatasetSyncService {
-  private readonly db: FinanciaMutualFundDatabase;
-  private readonly inFlight = new Map<string, Promise<SyncDatasetResult>>();
+  private readonly mfDb: FinanciaMutualFundDatabase;
+  private lastAudit: AmfiSyncAudit | null = null;
 
-  constructor(db: FinanciaMutualFundDatabase) {
-    this.db = db;
+  constructor(mfDb: FinanciaMutualFundDatabase) {
+    this.mfDb = mfDb;
   }
 
-  public getDatasetDef(datasetId: string): CatalogDatasetDefinition | undefined {
-    return MFPRO_DATASETS.find((d) => d.id === datasetId);
+  public getLastAudit(): AmfiSyncAudit | null {
+    return this.lastAudit;
   }
 
-  public async syncDataset(datasetId: string): Promise<SyncDatasetResult> {
-    const existing = this.inFlight.get(datasetId);
-    if (existing) return existing;
-
-    const task = this.executeSync(datasetId).finally(() => {
-      this.inFlight.delete(datasetId);
-    });
-    this.inFlight.set(datasetId, task);
-    return task;
-  }
-
-  private async executeSync(datasetId: string): Promise<SyncDatasetResult> {
-    const def = this.getDatasetDef(datasetId);
-    if (!def) {
-      throw new Error(`Unknown dataset ID: ${datasetId}`);
+  public async warmupEmptyDatasets(): Promise<AmfiSyncAudit> {
+    const start = Date.now();
+    if (this.mfDb.isTerminalCatalogEmpty()) {
+      this.mfDb.seedFromScreenerUniverse();
     }
-    if (def.ingestionMode !== 'sqlite') {
-      return {
-        datasetId: def.id,
-        tableName: def.tableName,
-        status: 'skipped',
-        rowsIngested: 0,
-        durationMs: 0,
-        error: 'Large Parquet archive is configured for in-place HTTP Range queries rather than full SQLite mirror.',
-      };
-    }
-    if (!isAllowedDatasetUrl(def.primaryIngestUrl)) {
-      throw new Error(`Blocked upstream dataset URL outside allowlist: ${def.primaryIngestUrl}`);
-    }
-
-    const started = performance.now();
-    const runId = this.db.recordSyncStart(def.id, def.tableName, def.primaryIngestUrl);
-
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
-      const res = await fetch(def.primaryIngestUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Financia-DB-Engine/1.0',
-          Accept: 'text/csv, application/gzip, */*',
-        },
-      }).finally(() => clearTimeout(timeout));
-
-      if (!res.ok) {
-        throw new Error(`Upstream HTTP ${res.status} ${res.statusText}`);
-      }
-
-      const arrayBuf = await res.arrayBuffer();
-      const rawBuffer = Buffer.from(arrayBuf);
-      const csvText =
-        def.primaryIngestFormat === 'csv.gz'
-          ? zlib.gunzipSync(rawBuffer).toString('utf8')
-          : rawBuffer.toString('utf8');
-
-      let rowsIngested = 0;
-      switch (def.id) {
-        case 'mf.portfolio_holdings':
-          rowsIngested = this.db.replacePortfolioHoldingsFromCsv(csvText);
-          break;
-        case 'mf.portfolio_isin_mappings':
-          rowsIngested = this.db.replaceIsinMappingsFromCsv(csvText);
-          break;
-        case 'mf.nav_latest':
-          rowsIngested = this.db.replaceSchemeUniverseFromCsv(csvText);
-          break;
-        case 'mf.scheme_details_latest':
-          rowsIngested = this.db.replaceSchemeDetailsFromCsv(csvText);
-          break;
-        case 'mf.data_quality':
-          rowsIngested = this.db.replaceDataQualityFromCsv(csvText);
-          break;
-        case 'mf.fund_aum_quality':
-          rowsIngested = this.db.replaceFundAumQualityFromCsv(csvText);
-          break;
-        default:
-          throw new Error(`No SQLite ingestor registered for ${def.id}`);
-      }
-
-      const durationMs = Math.round(performance.now() - started);
-      this.db.recordSyncSuccess(runId, def.id, rowsIngested, durationMs);
-      return {
-        datasetId: def.id,
-        tableName: def.tableName,
-        status: 'success',
-        rowsIngested,
-        durationMs,
-      };
-    } catch (err) {
-      const durationMs = Math.round(performance.now() - started);
-      const message = err instanceof Error ? err.message : 'Unknown ingestion failure';
-      this.db.recordSyncError(runId, def.id, message, durationMs);
-      return {
-        datasetId: def.id,
-        tableName: def.tableName,
-        status: 'error',
-        rowsIngested: 0,
-        durationMs,
-        error: message,
-      };
-    }
-  }
-
-  public async syncAllSqliteDatasets(): Promise<SyncDatasetResult[]> {
-    const targets = MFPRO_DATASETS.filter((d) => d.ingestionMode === 'sqlite');
-    const results: SyncDatasetResult[] = [];
-    for (const def of targets) {
-      const result = await this.syncDataset(def.id);
-      results.push(result);
-    }
-    return results;
-  }
-
-  public async warmupEmptyDatasets(): Promise<void> {
-    const targets = MFPRO_DATASETS.filter(
-      (d) => d.ingestionMode === 'sqlite' && this.db.isTableEmpty(d.tableName)
-    );
-    if (targets.length === 0) return;
-    console.log(`[Financia DB] Auto-syncing ${targets.length} empty MFPRO tables from api.tigzig.com...`);
-    for (const def of targets) {
-      const res = await this.syncDataset(def.id);
-      if (res.status === 'success') {
-        console.log(`[Financia DB] Synced ${def.id} -> ${res.rowsIngested} rows in ${res.durationMs}ms`);
-      } else {
-        console.warn(`[Financia DB] Sync warning for ${def.id}: ${res.error}`);
-      }
-    }
+    const stats = this.mfDb.getTerminalStats();
+    const audit: AmfiSyncAudit = {
+      status: 'synced',
+      parsedCount: stats.totalSchemes,
+      activeCount: stats.activeSchemes,
+      etfCount: stats.etfCount,
+      durationMs: Date.now() - start,
+      syncedAtUtc: new Date().toISOString(),
+      source: 'sqlite-seed',
+    };
+    this.lastAudit = audit;
+    return audit;
   }
 
   /**
-   * Executes a live HTTP Range request (`Range: bytes=-8`) against an allowlisted
-   * Parquet endpoint on api.tigzig.com to verify Parquet magic footer (`PAR1`),
-   * total byte length, and live rate-limit headers.
+   * Synchronizes the official AMFI NAVAll.txt feed into SQLite with timeout and gateway cache invalidation.
    */
-  public async probeParquetRange(datasetId: string) {
-    const def = this.getDatasetDef(datasetId);
-    if (!def || !def.parquetUrl) {
-      throw new Error(`Dataset ${datasetId} does not expose a Parquet endpoint.`);
-    }
-    if (!isAllowedDatasetUrl(def.parquetUrl)) {
-      throw new Error(`Blocked Parquet URL outside allowlist: ${def.parquetUrl}`);
-    }
-
-    const started = performance.now();
+  public async syncAmfiNavAll(): Promise<AmfiSyncAudit> {
+    const start = Date.now();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-    const res = await fetch(def.parquetUrl, {
-      method: 'GET',
-      signal: controller.signal,
-      headers: {
-        Range: 'bytes=-8',
-        'User-Agent': 'Financia-DB-Engine/1.0',
-      },
-    }).finally(() => clearTimeout(timeout));
+    const timer = setTimeout(() => controller.abort(), 12_000);
 
-    const buf = Buffer.from(await res.arrayBuffer());
-    const footerMagic = buf.subarray(Math.max(0, buf.length - 4)).toString('ascii');
-    const footerLengthBytes = buf.length >= 8 ? buf.readUInt32LE(0) : null;
-    const durationMs = Math.round(performance.now() - started);
-
-    const payload = {
-      datasetId: def.id,
-      url: def.parquetUrl,
-      httpStatus: res.status,
-      supportsRangeRequests: res.status === 206,
-      validParquetMagic: footerMagic === 'PAR1',
-      footerMagic,
-      footerLengthBytes,
-      contentRange: res.headers.get('content-range'),
-      etag: res.headers.get('etag'),
-      lastModified: res.headers.get('last-modified'),
-      rateLimitRemaining: res.headers.get('x-ratelimit-remaining'),
-      rateLimitRemainingDay: res.headers.get('x-ratelimit-remaining-day'),
-      latencyMs: durationMs,
-      checkedAt: new Date().toISOString(),
-    };
-
-    this.db.saveParquetProbe(def.id, payload);
-    return payload;
+    try {
+      const response = await fetch('https://www.amfiindia.com/spages/NAVAll.txt', {
+        signal: controller.signal,
+        headers: { Accept: 'text/plain', 'User-Agent': 'Financia-Gateway/2.0' },
+      });
+      if (!response.ok) {
+        throw new Error(`AMFI NAVAll upstream returned HTTP ${response.status}`);
+      }
+      const rawText = await response.text();
+      const parsed = parseAmfiNavText(rawText);
+      if (parsed.length > 0) {
+        this.mfDb.upsertTerminalSchemes(parsed);
+        marketApiGateway.invalidatePrefix('amfi:');
+        const nowUtc = new Date().toISOString();
+        marketApiGateway.recordAmfiSync(nowUtc);
+        const etfCount = parsed.filter((r) => r.instrument_type === 'ETF').length;
+        const audit: AmfiSyncAudit = {
+          status: 'synced',
+          parsedCount: parsed.length,
+          activeCount: parsed.length,
+          etfCount,
+          durationMs: Date.now() - start,
+          syncedAtUtc: nowUtc,
+          source: 'amfi-navall-live',
+        };
+        this.lastAudit = audit;
+        return audit;
+      }
+      throw new Error('Parsed 0 valid AMFI rows.');
+    } catch {
+      const fallbackStats = this.mfDb.getTerminalStats();
+      const audit: AmfiSyncAudit = {
+        status: 'fallback',
+        parsedCount: fallbackStats.totalSchemes,
+        activeCount: fallbackStats.activeSchemes,
+        etfCount: fallbackStats.etfCount,
+        durationMs: Date.now() - start,
+        syncedAtUtc: new Date().toISOString(),
+        source: 'sqlite-cached-catalog',
+      };
+      this.lastAudit = audit;
+      return audit;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }

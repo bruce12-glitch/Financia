@@ -51,6 +51,8 @@ export interface FeaturedIpoItem {
   exchange: string;
   valuation: string;
   accentColor: string;
+  date?: string;
+  offerPrice?: string;
 }
 
 export interface CommunityIdeaItem {
