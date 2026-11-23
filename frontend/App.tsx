@@ -9,11 +9,10 @@ import {
 } from '../landing';
 import { FrontendWorkspaceHeader } from './components/FrontendWorkspaceHeader';
 import { FrontendCapabilityHub } from './components/FrontendCapabilityHub';
-import { GlobalExchangesGlobeSection } from './components/GlobalExchangesGlobeSection';
+import { InstrumentAnalysisSection } from './components/InstrumentAnalysisSection';
 import { InvestorToolsWorkbench } from './components/InvestorToolsWorkbench';
 import { LiveStockTerminal, TerminalTabId } from './components/LiveStockTerminal';
 import { MarketSummaryAndIdeas } from './components/MarketSummaryAndIdeas';
-import { MarketsSections } from './components/MarketsSections';
 import { MutualFundEtfScreenerSection } from './components/MutualFundEtfScreenerSection';
 import { AccountSecurityModal } from './components/AccountSecurityModal';
 import { GlobalModals } from './components/GlobalModals';
@@ -361,6 +360,7 @@ export default function App() {
 
       const frontendSections = new Set([
         'workspace-overview',
+        'instrument-analysis',
         'mf-etf-screener',
         'market-summary',
         'markets',
@@ -784,48 +784,45 @@ export default function App() {
             </main>
           ) : (
             <main id="frontend-section" data-testid="frontend-workspace" className="flex-1">
-              {/* 1. Application Capabilities Hub — Showcases everything Financia does + launches Dedicated Terminal */}
+              {/* 1. Workspace Command Bar & Direct Fund Lookup */}
               <FrontendCapabilityHub
                 activeRegion={activeRegion}
                 onLaunchTerminal={(tab) => enterTerminal(tab || 'individual')}
                 onJumpToSection={handleJumpToSection}
+                onInspectTicker={(sym) => {
+                  handleSelectPrimaryTicker(sym);
+                  handleJumpToSection('instrument-analysis');
+                }}
               />
 
-              {/* 2. Mutual Fund & ETF Screener with Deep 9-Panel Dossier & Interactive Terminal Mode */}
-              <MutualFundEtfScreenerSection
-                externalSelectedSymbol={selectedTicker}
-                onJumpToAnalysis={handleOpenInTerminal}
-                onJumpToCommunity={() => handleJumpToSection('market-summary')}
+              {/* 2. Dedicated Instrument Analysis Desk (Interactive Quant Chart, Technicals, Risk/Capture, Stress & Sizing) */}
+              <InstrumentAnalysisSection
+                selectedSymbol={selectedTicker}
+                onSelectInstrumentSymbol={handleSelectPrimaryTicker}
+                onJumpToTerminal={(ticker, peers) => handleOpenInTerminal(ticker, peers, 'individual')}
               />
 
-              {/* 3. Market Summary, ETFs, Gold Allocation, Debt Yields, NFOs & Top Stories */}
+              {/* 3. User-Definable Asset Class Performance Map, Neutral Watchboard & Sovereign Yield Curve */}
               <MarketSummaryAndIdeas
-                onSelectSymbol={(row) => handleOpenInTerminal(row.symbol)}
+                onSelectSymbol={(row) => {
+                  handleSelectPrimaryTicker(row.symbol);
+                  handleJumpToSection('instrument-analysis');
+                }}
                 onSelectNews={setSelectedNews}
                 onSelectIdea={setSelectedIdea}
                 onJumpToAnalysis={handleOpenInTerminal}
                 liveFeedActive={liveFeedActive}
               />
 
-              {/* 4. Direct Mutual Funds, Gold & Bullion, Debt Funds, FX Hedging & Macro Inflation */}
-              <MarketsSections
-                onSelectSymbol={(row) => handleOpenInTerminal(row.symbol)}
-                onSelectNews={setSelectedNews}
-                onSelectIdea={setSelectedIdea}
-                onOpenFxRatesModal={() => setFxRatesOpen(true)}
+              {/* 4. Mutual Fund & ETF Screener with Deep Dossier & Filtering */}
+              <MutualFundEtfScreenerSection
+                externalSelectedSymbol={selectedTicker}
                 onJumpToAnalysis={handleOpenInTerminal}
+                onJumpToCommunity={() => handleJumpToSection('market-summary')}
               />
 
-              {/* 5. Step-Up SIP & Direct Plan Savings Calculator + Multi-Asset Portfolio Planner */}
+              {/* 5. Step-Up SIP & Direct Plan Savings Calculator */}
               <InvestorToolsWorkbench onJumpToAnalysis={handleOpenInTerminal} />
-
-              {/* 6. Global Exchanges & Market Hubs Directory */}
-              <GlobalExchangesGlobeSection
-                onJumpToAnalysis={(ticker) => handleOpenInTerminal(ticker, undefined, 'individual')}
-                onCompareExchangeBenchmarks={(primary, peers) =>
-                  handleOpenInTerminal(primary, peers, 'compare')
-                }
-              />
             </main>
           )}
         </>

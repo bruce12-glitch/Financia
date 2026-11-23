@@ -84,6 +84,21 @@ export const FrontendWorkspaceHeader: React.FC<FrontendWorkspaceHeaderProps> = (
           </button>
           <button
             type="button"
+            data-testid="nav-instrument-analysis"
+            onClick={() => onJumpToSection('instrument-analysis')}
+            className="hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          >
+            Instrument Analysis
+          </button>
+          <button
+            type="button"
+            onClick={() => onJumpToSection('market-summary')}
+            className="hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          >
+            Performance Map
+          </button>
+          <button
+            type="button"
             onClick={() => onJumpToSection('mf-etf-screener')}
             className="hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
@@ -91,24 +106,10 @@ export const FrontendWorkspaceHeader: React.FC<FrontendWorkspaceHeaderProps> = (
           </button>
           <button
             type="button"
-            onClick={() => onJumpToSection('market-summary')}
-            className="hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
-          >
-            Markets
-          </button>
-          <button
-            type="button"
             onClick={() => onJumpToSection('sip-tools-workbench')}
             className="hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
-            SIP &amp; Planner
-          </button>
-          <button
-            type="button"
-            onClick={() => onJumpToSection('global-exchanges-globe')}
-            className="hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
-          >
-            Global Exchanges
+            SIP Planner
           </button>
           <button
             type="button"

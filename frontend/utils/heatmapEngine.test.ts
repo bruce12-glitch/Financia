@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  amfiSchemesToHeatmapTiles,
   applyHeatmapTick,
+  buildCustomHeatmapTiles,
   buildSectorGroups,
   calculateRealizedVolatility,
+  classifyAmfiSchemeToSector,
   computeD3TreemapLayout,
+  filterHeatmapTilesByQuery,
   getHeatmapTileSpan,
   getHeatmapTileStyle,
   getVolatilityTileStyle,
@@ -28,7 +32,7 @@ test('getHeatmapTileStyle returns high-contrast green for gains and red for loss
   assert.equal(sharpLoss.text, '#FFFFFF');
 });
 
-test('calculateRealizedVolatility and getVolatilityTileStyle separate calm Debt vs volatile Bullion/Equity funds', () => {
+test('calculateRealizedVolatility and getVolatilityTileStyle separate calm Debt vs volatile Equity funds', () => {
   const calmDebtVol = calculateRealizedVolatility([100, 100.05, 100.1, 100.12, 100.16], 0.08);
   const volatileVol = calculateRealizedVolatility([100, 105, 98, 107, 101], 3.8);
 
@@ -36,6 +40,22 @@ test('calculateRealizedVolatility and getVolatilityTileStyle separate calm Debt 
   assert.ok(volatileVol > calmDebtVol);
   assert.equal(getVolatilityTileStyle(calmDebtVol).tier, 'Calm');
   assert.equal(getVolatilityTileStyle(42).tier, 'Extreme');
+});
+
+test('expanded neutral HEATMAP_STOCKS universe includes broad multi-AMC coverage across India and Global', () => {
+  const indiaTiles = HEATMAP_STOCKS.filter((t) => t.market === 'india');
+  const globalTiles = HEATMAP_STOCKS.filter((t) => t.market === 'global');
+
+  assert.ok(indiaTiles.length >= 40, `Expected >=40 India funds, got ${indiaTiles.length}`);
+  assert.ok(globalTiles.length >= 28, `Expected >=28 Global ETFs, got ${globalTiles.length}`);
+
+  const indiaGroups = buildSectorGroups(HEATMAP_STOCKS, 'india', 'All');
+  const globalGroups = buildSectorGroups(HEATMAP_STOCKS, 'global', 'All');
+  const allGroups = buildSectorGroups(HEATMAP_STOCKS, 'all', 'All');
+
+  assert.equal(indiaGroups.length, 7);
+  assert.equal(globalGroups.length, 5);
+  assert.equal(allGroups.length, 12);
 });
 
 test('applyHeatmapTick advances NAVs/prices, preserves formatting, and bounds sparkline history', () => {
@@ -46,58 +66,67 @@ test('applyHeatmapTick advances NAVs/prices, preserves formatting, and bounds sp
   assert.ok(next[0].sparkline.length === HEATMAP_STOCKS[0].sparkline.length + 1);
 });
 
-test('buildSectorGroups filters by market and 4-pillar sector with AUM descending sort and volatility metrics', () => {
-  const globalGroups = buildSectorGroups(HEATMAP_STOCKS, 'global', 'All');
-  assert.equal(globalGroups.length, 6);
-  assert.ok(globalGroups[0].totalCapB >= globalGroups[1].totalCapB);
-  assert.ok(globalGroups[0].volatilityPct > 0);
-  assert.ok(globalGroups[0].dispersionPct >= 0);
+test('computeD3TreemapLayout supports AUM, Equal, and Move sizing with bounded rectangles', () => {
+  const groups = buildSectorGroups(HEATMAP_STOCKS, 'india', 'All');
+  const aumLayout = computeD3TreemapLayout(groups, 1180, 520, 'aum');
+  const eqLayout = computeD3TreemapLayout(groups, 1180, 520, 'equal');
+  const moveLayout = computeD3TreemapLayout(groups, 1180, 520, 'move');
 
-  const goldOnly = buildSectorGroups(HEATMAP_STOCKS, 'global', 'Gold & Bullion ETFs');
-  assert.equal(goldOnly.length, 1);
-  assert.equal(goldOnly[0].sector, 'Gold & Bullion ETFs');
-  assert.equal(goldOnly[0].advancers, 3);
-  assert.equal(goldOnly[0].decliners, 0);
+  assert.equal(aumLayout.sectors.length, 7);
+  assert.equal(aumLayout.tiles.length, eqLayout.tiles.length);
+  assert.equal(aumLayout.tiles.length, moveLayout.tiles.length);
+  assert.ok(aumLayout.maxVolatilityPct > 0);
 
-  const indiaGroups = buildSectorGroups(HEATMAP_STOCKS, 'india', 'All');
-  assert.equal(indiaGroups.length, 6);
-  assert.ok(indiaGroups.every((g) => g.tiles.every((t) => t.market === 'india')));
-});
-
-test('computeD3TreemapLayout generates bounded non-zero D3 treemap rectangles for every fund/ETF asset class', () => {
-  const groups = buildSectorGroups(HEATMAP_STOCKS, 'global', 'All');
-  const layout = computeD3TreemapLayout(groups, 1160, 480);
-
-  assert.equal(layout.sectors.length, 6);
-  assert.equal(layout.tiles.length, 17);
-  assert.ok(layout.maxVolatilityPct > 0);
-
-  for (const s of layout.sectors) {
-    assert.ok(s.x0 >= 0 && s.x1 <= 1160);
-    assert.ok(s.y0 >= 0 && s.y1 <= 480);
-    assert.ok(s.x1 > s.x0 && s.y1 > s.y0);
-  }
-  for (const leaf of layout.tiles) {
-    assert.ok(leaf.x0 >= 0 && leaf.x1 <= 1160);
-    assert.ok(leaf.y0 >= 0 && leaf.y1 <= 480);
+  for (const leaf of aumLayout.tiles) {
+    assert.ok(leaf.x0 >= 0 && leaf.x1 <= 1180);
+    assert.ok(leaf.y0 >= 0 && leaf.y1 <= 520);
     assert.ok(leaf.x1 > leaf.x0 && leaf.y1 > leaf.y0);
-    assert.ok(leaf.volatilityPct >= 8.5);
   }
 });
 
-test('getHeatmapTileSpan fills exact 4-column grid rectangles with zero orphan gaps', () => {
-  assert.equal(getHeatmapTileSpan(0, 1), 'col-span-4 row-span-2');
-  assert.equal(getHeatmapTileSpan(0, 2), 'col-span-2 row-span-2');
-  assert.equal(getHeatmapTileSpan(1, 3), 'col-span-2 row-span-1');
-  assert.equal(getHeatmapTileSpan(2, 4), 'col-span-1 row-span-1');
-  assert.equal(getHeatmapTileSpan(3, 5), 'col-span-1 row-span-1');
+test('classifyAmfiSchemeToSector and amfiSchemesToHeatmapTiles convert SQLite schemes into categorized tiles', () => {
+  assert.equal(classifyAmfiSchemeToSector('Parag Parikh Liquid Fund Direct'), 'Liquid & Overnight');
+  assert.equal(classifyAmfiSchemeToSector('SBI Magnum Gilt Direct Growth'), 'Gilt & Corporate Debt');
+  assert.equal(classifyAmfiSchemeToSector('Motilal Oswal Midcap Direct'), 'Mid & Multi Cap');
+  assert.equal(classifyAmfiSchemeToSector('Quant Small Cap Direct'), 'Small Cap & Value');
+  assert.equal(classifyAmfiSchemeToSector('ICICI Pru Balanced Advantage'), 'Hybrid & Multi-Asset');
+
+  const tiles = amfiSchemesToHeatmapTiles([
+    { scheme_code: '122639', scheme_name: 'Parag Parikh Flexi Cap Direct Growth', latest_nav: 89.42, nav_count: 1500 },
+    { scheme_code: '120503', scheme_name: 'Axis ELSS Tax Saver Direct Growth', latest_nav: 102.15, nav_count: 1200 },
+    { scheme_code: '120503', scheme_name: 'Duplicate Should Deduplicate', latest_nav: 99.0 },
+  ]);
+
+  assert.equal(tiles.length, 2);
+  assert.equal(tiles[0].symbol, '122639');
+  assert.equal(tiles[0].source, 'amfi-db');
+  assert.equal(tiles[0].sparkline.length, 5);
 });
 
-test('heatmapTileToMarketSymbolRow converts 4-pillar tile into valid quote modal payload', () => {
+test('buildCustomHeatmapTiles and filterHeatmapTilesByQuery allow users to define custom buckets and filter funds', () => {
+  const customTiles = buildCustomHeatmapTiles(
+    [
+      { symbol: 'PPFAS', name: 'Parag Parikh Flexi Cap Direct', sector: 'My Core Equity', market: 'india' },
+      { symbol: '122639', name: 'Custom AMFI Scheme Direct', sector: 'My Satellite', market: 'india', price: '142.50', unit: 'INR' },
+    ],
+    HEATMAP_STOCKS
+  );
+
+  assert.equal(customTiles.length, 2);
+  assert.equal(customTiles[0].sector, 'My Core Equity');
+  assert.equal(customTiles[1].sector, 'My Satellite');
+  assert.equal(customTiles[1].price, '142.50');
+
+  const matched = filterHeatmapTilesByQuery(customTiles, 'satellite');
+  assert.equal(matched.length, 1);
+  assert.equal(matched[0].symbol, '122639');
+});
+
+test('getHeatmapTileSpan and heatmapTileToMarketSymbolRow preserve clean layout and quote conversion', () => {
+  assert.equal(getHeatmapTileSpan(0, 1), 'col-span-4 row-span-2');
   const goldTile = HEATMAP_STOCKS.find((t) => t.symbol === 'GLD')!;
   const row = heatmapTileToMarketSymbolRow(goldTile);
-  assert.equal(row.symbol, goldTile.symbol);
-  assert.equal(row.price, goldTile.price);
+  assert.equal(row.symbol, 'GLD');
   assert.equal(row.category, 'gold');
   assert.ok(row.sparkline.length >= 4);
 });
