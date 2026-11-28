@@ -11,7 +11,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "lint:rules": "eslint firestore.rules",
-    "test": "tsx --test tests/firestore.rules.test.ts backend/services/casPdfParser.test.ts frontend/features/portfolio/portfolioLedgerEngine.test.ts frontend/features/backtester/backtestEngine.test.ts"
+    "test": "tsx --test tests/firestore.rules.test.ts backend/services/casPdfParser.test.ts backend/holdingNotes.test.ts backend/catalog/holdings.test.ts frontend/features/portfolio/portfolioLedgerEngine.test.ts frontend/features/backtester/backtestEngine.test.ts frontend/utils/holdingNotesEngine.test.ts frontend/utils/holdingsHierarchyEngine.test.ts"
   },
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",

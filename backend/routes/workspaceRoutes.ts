@@ -9,6 +9,7 @@ import {
   validateInquiryForm,
   validateTickerInput,
 } from '../../frontend/utils/stockEngine.ts';
+import { validateHoldingNoteInput } from '../../frontend/utils/holdingNotesEngine.ts';
 import { getAuthenticatedUser } from '../services/authService.ts';
 import { securityAuditLog } from '../services/auditLogService.ts';
 import { extractClientIp } from '../middleware/securityMiddleware.ts';
@@ -249,6 +250,98 @@ export function createWorkspaceRouter(store: PersistenceStore = financiaStore): 
       return;
     }
     res.json({ inquiries: store.listUserInquiries(user.id) });
+  });
+
+  // --- Portfolio Holding Research Notes (Authenticated, User-Scoped) ---
+  router.get('/holding-notes', (req, res) => {
+    const user = getAuthenticatedUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required to access holding notes.' });
+      return;
+    }
+    const rawFundCode = typeof req.query.fundCode === 'string' ? req.query.fundCode.trim() : '';
+    if (rawFundCode && !/^[A-Za-z0-9._-]{2,40}$/.test(rawFundCode)) {
+      res.status(400).json({ error: 'Invalid fundCode filter.' });
+      return;
+    }
+    const notes = store.getUserHoldingNotes(user.id, rawFundCode || undefined);
+    res.json({ notes });
+  });
+
+  router.put('/holding-notes', (req, res) => {
+    const user = getAuthenticatedUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required to save holding notes.' });
+      return;
+    }
+
+    const body = (req.body || {}) as {
+      fundCode?: string;
+      holdingKey?: string;
+      securityName?: string;
+      isin?: string | null;
+      nseSymbol?: string | null;
+      noteText?: string;
+      stance?: string;
+    };
+
+    const validation = validateHoldingNoteInput({
+      fundCode: String(body.fundCode || ''),
+      holdingKey: typeof body.holdingKey === 'string' ? body.holdingKey : undefined,
+      securityName: String(body.securityName || ''),
+      isin: typeof body.isin === 'string' ? body.isin : null,
+      nseSymbol: typeof body.nseSymbol === 'string' ? body.nseSymbol : null,
+      noteText: String(body.noteText || ''),
+      stance: typeof body.stance === 'string' ? body.stance : undefined,
+    });
+
+    if (!validation.valid || !validation.sanitized) {
+      res.status(400).json({ error: validation.error || 'Invalid holding note payload.' });
+      return;
+    }
+
+    const { note, notes, created } = store.upsertUserHoldingNote(user.id, {
+      ...validation.sanitized,
+      idGenerator: () => `hnote_${crypto.randomUUID().slice(0, 12)}`,
+    });
+
+    securityAuditLog.record({
+      event: 'notes.upsert',
+      userId: user.id,
+      rawIp: extractClientIp(req),
+      detail: `${created ? 'Created' : 'Updated'} holding note for ${note.holdingKey} (${note.stance})`,
+    });
+
+    res.status(created ? 201 : 200).json({ note, notes });
+  });
+
+  router.delete('/holding-notes/:id', (req, res) => {
+    const user = getAuthenticatedUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required to delete holding notes.' });
+      return;
+    }
+
+    const noteId = String(req.params.id || '').trim();
+    if (!/^[A-Za-z0-9_-]{4,64}$/.test(noteId)) {
+      res.status(400).json({ error: 'Invalid holding note id.' });
+      return;
+    }
+
+    const removed = store.deleteUserHoldingNote(user.id, noteId);
+    if (!removed) {
+      res.status(404).json({ error: 'Holding note not found.' });
+      return;
+    }
+
+    securityAuditLog.record({
+      event: 'notes.delete',
+      userId: user.id,
+      rawIp: extractClientIp(req),
+      detail: `Deleted holding note ${noteId}`,
+    });
+
+    res.json({ ok: true, notes: store.getUserHoldingNotes(user.id) });
   });
 
   return router;

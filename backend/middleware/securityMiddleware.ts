@@ -68,6 +68,7 @@ export function applySecurityHeaders(
     req.path.startsWith('/api/auth') ||
     req.path.startsWith('/api/alerts') ||
     req.path.startsWith('/api/watchlist') ||
+    req.path.startsWith('/api/holding-notes') ||
     req.path.startsWith('/api/security') ||
     req.path.startsWith('/api/portfolio')
   ) {

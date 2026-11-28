@@ -9,6 +9,8 @@ export type AuditEventType =
   | 'alerts.create'
   | 'alerts.delete'
   | 'watchlist.update'
+  | 'notes.upsert'
+  | 'notes.delete'
   | 'screener.compare'
   | 'portfolio.cas_pdf_parsed'
   | 'portfolio.cas_pdf_error'

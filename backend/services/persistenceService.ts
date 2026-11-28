@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { AuthUser } from '../../frontend/utils/authEngine.ts';
 import { PriceAlert } from '../../frontend/utils/alertEngine.ts';
+import { HoldingNoteRecord } from '../../frontend/utils/holdingNotesEngine.ts';
 
 export interface StoredAccountRecord {
   user: AuthUser;
@@ -33,6 +34,7 @@ export interface FinanciaDatabaseSchema {
   accounts: Record<string, StoredAccountRecord>;
   alertsByUser: Record<string, PriceAlert[]>;
   watchlistsByUser: Record<string, UserWatchlistState>;
+  holdingNotesByUser: Record<string, HoldingNoteRecord[]>;
   inquiries: ResearchInquiry[];
 }
 
@@ -50,6 +52,7 @@ function createEmptyDb(): FinanciaDatabaseSchema {
     accounts: {},
     alertsByUser: {},
     watchlistsByUser: {},
+    holdingNotesByUser: {},
     inquiries: [],
   };
 }
@@ -73,6 +76,10 @@ export function createPersistenceStore(filePath: string = DEFAULT_STORE_PATH) {
         watchlistsByUser:
           parsed.watchlistsByUser && typeof parsed.watchlistsByUser === 'object'
             ? parsed.watchlistsByUser
+            : {},
+        holdingNotesByUser:
+          parsed.holdingNotesByUser && typeof parsed.holdingNotesByUser === 'object'
+            ? parsed.holdingNotesByUser
             : {},
         inquiries: Array.isArray(parsed.inquiries) ? parsed.inquiries : [],
       };
@@ -193,6 +200,63 @@ export function createPersistenceStore(filePath: string = DEFAULT_STORE_PATH) {
       state.watchlistsByUser[userId] = next;
       flushToDisk();
       return { ...next };
+    },
+
+    // Portfolio Holding Research Notes (User-scoped)
+    getUserHoldingNotes(userId: string, fundCode?: string): HoldingNoteRecord[] {
+      const notes = state.holdingNotesByUser[userId] || [];
+      if (!fundCode) return [...notes];
+      const normalizedFund = fundCode.trim().toUpperCase();
+      return notes.filter((n) => n.fundCode === normalizedFund);
+    },
+    upsertUserHoldingNote(
+      userId: string,
+      input: Omit<HoldingNoteRecord, 'id' | 'createdAt' | 'updatedAt'> & { idGenerator: () => string }
+    ): { note: HoldingNoteRecord; notes: HoldingNoteRecord[]; created: boolean } {
+      const existing = state.holdingNotesByUser[userId] || [];
+      const nowIso = new Date().toISOString();
+      const match = existing.find((item) => item.holdingKey === input.holdingKey);
+
+      const savedNote: HoldingNoteRecord = match
+        ? {
+            ...match,
+            fundCode: input.fundCode,
+            securityName: input.securityName,
+            isin: input.isin,
+            nseSymbol: input.nseSymbol,
+            noteText: input.noteText,
+            stance: input.stance,
+            updatedAt: nowIso,
+          }
+        : {
+            id: input.idGenerator(),
+            fundCode: input.fundCode,
+            holdingKey: input.holdingKey,
+            securityName: input.securityName,
+            isin: input.isin,
+            nseSymbol: input.nseSymbol,
+            noteText: input.noteText,
+            stance: input.stance,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          };
+
+      const next = [
+        savedNote,
+        ...existing.filter((item) => item.holdingKey !== savedNote.holdingKey),
+      ].slice(0, 500);
+
+      state.holdingNotesByUser[userId] = next;
+      flushToDisk();
+      return { note: savedNote, notes: [...next], created: !match };
+    },
+    deleteUserHoldingNote(userId: string, noteId: string): boolean {
+      const existing = state.holdingNotesByUser[userId] || [];
+      const next = existing.filter((item) => item.id !== noteId);
+      if (next.length === existing.length) return false;
+      state.holdingNotesByUser[userId] = next;
+      flushToDisk();
+      return true;
     },
 
     // Research Inquiries

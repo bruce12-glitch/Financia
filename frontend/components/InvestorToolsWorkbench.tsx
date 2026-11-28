@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   Calculator,
+  LayoutGrid,
   PieChart,
   RefreshCw,
   Search,
@@ -23,6 +24,7 @@ import {
   SipInstrumentOption,
   SipInstrumentTypeFilter,
 } from '../utils/sipCalculatorEngine';
+import { HoldingsStructureVisualizer } from './HoldingsStructureVisualizer';
 
 interface InvestorToolsWorkbenchProps {
   onJumpToAnalysis?: (ticker: string) => void;
@@ -93,7 +95,7 @@ function formatInrCompact(value: number): string {
 export const InvestorToolsWorkbench: React.FC<InvestorToolsWorkbenchProps> = ({
   onJumpToAnalysis,
 }) => {
-  const [activeTab, setActiveTab] = useState<'sip' | 'allocation'>('sip');
+  const [activeTab, setActiveTab] = useState<'sip' | 'allocation' | 'holdings'>('sip');
 
   // Dual-Mode SIP Calculator State:
   // 'custom' = None / Custom Return % (user chooses exact percentage, no particular fund locked)
@@ -304,23 +306,23 @@ export const InvestorToolsWorkbench: React.FC<InvestorToolsWorkbenchProps> = ({
       id="sip-tools-workbench"
       data-testid="investor-tools-workbench"
       aria-label="Investment Calculators and Portfolio Allocation Planner"
-      className="w-full bg-white text-[#0f172a] py-14 border-b border-[#e2e8f0]"
+      className="w-full bg-white text-[#0f172a] py-10 border-b border-[#e2e8f0]"
     >
       <div className="max-w-[1240px] mx-auto px-6">
         {/* Clean Institutional Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 mb-7 border-b border-[#e2e8f0]">
-          <div>
-            <div className="text-xs font-mono uppercase tracking-[0.08em] text-[#2563eb] font-semibold mb-1.5">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-5 mb-5 border-b border-[#e2e8f0]">
+          <div className="min-w-0">
+            <div className="text-xs font-mono uppercase tracking-[0.08em] text-[#2563eb] font-semibold mb-1">
               Investor Planning Workbench
             </div>
             <h2
               className="font-display font-semibold text-[#0f172a] tracking-tight"
-              style={{ fontSize: 'clamp(1.5rem, 2.4vw, 2.05rem)' }}
+              style={{ fontSize: 'clamp(1.35rem, 2.0vw, 1.75rem)' }}
             >
-              SIP Return Calculator &amp; Portfolio Planner
+              SIP Calculator, Asset Planner &amp; Holdings Structure
             </h2>
             <p className="text-sm text-[#475569] mt-1">
-              Calculate Step-Up SIP compounding using your own custom return percentage (no fund required) or pick any of our {allInstruments.length} indexed Mutual Funds &amp; ETFs.
+              Model Step-Up SIP compounding, balance multi-asset portfolios, or inspect disclosed fund holdings with D3 treemap and sunburst charts.
             </p>
           </div>
 
@@ -328,7 +330,7 @@ export const InvestorToolsWorkbench: React.FC<InvestorToolsWorkbenchProps> = ({
           <div
             role="tablist"
             aria-label="Investor planning tools"
-            className="inline-flex items-center p-1 rounded-[10px] bg-[#f1f5f9] border border-[#e2e8f0] shrink-0 self-start md:self-auto"
+            className="inline-flex flex-wrap items-center p-1 rounded-[10px] bg-[#f1f5f9] border border-[#e2e8f0] shrink-0 self-start lg:self-auto"
           >
             <button
               type="button"
@@ -359,6 +361,21 @@ export const InvestorToolsWorkbench: React.FC<InvestorToolsWorkbenchProps> = ({
             >
               <PieChart className="w-3.5 h-3.5" />
               <span>Asset Allocation Planner</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'holdings'}
+              data-testid="workbench-tab-holdings"
+              onClick={() => setActiveTab('holdings')}
+              className={`px-3.5 py-2 rounded-[7px] text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+                activeTab === 'holdings'
+                  ? 'bg-[#0f172a] text-white'
+                  : 'text-[#475569] hover:text-[#0f172a]'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Holdings Treemap &amp; Sunburst</span>
             </button>
           </div>
         </div>
@@ -971,6 +988,9 @@ export const InvestorToolsWorkbench: React.FC<InvestorToolsWorkbenchProps> = ({
               </div>
             </div>
           </div>
+        ) : activeTab === 'holdings' ? (
+          /* TAB 3: D3 PORTFOLIO HOLDINGS TREEMAP & SUNBURST (/api/db/holdings) */
+          <HoldingsStructureVisualizer onJumpToAnalysis={onJumpToAnalysis} />
         ) : (
           /* TAB 2: MULTI-ASSET PORTFOLIO ALLOCATOR & RISK REBALANCER */
           <div
