@@ -1,5 +1,9 @@
+import zlib from 'zlib';
 import { marketApiGateway } from '../services/apiGatewayCache.ts';
 import { FinanciaMutualFundDatabase, TerminalSchemeRecord } from './database.ts';
+
+const MF_PORTFOLIO_HOLDINGS_URL = 'https://api.tigzig.com/downloads/mf_portfolio_holdings.csv';
+const MF_SCHEME_DETAILS_URL = 'https://api.tigzig.com/mf/v1/download/scheme_details_latest.csv.gz';
 
 export interface AmfiSyncAudit {
   status: 'synced' | 'fallback';
@@ -130,6 +134,8 @@ export function parseAmfiNavText(rawText: string): TerminalSchemeRecord[] {
 export class DatasetSyncService {
   private readonly mfDb: FinanciaMutualFundDatabase;
   private lastAudit: AmfiSyncAudit | null = null;
+  private holdingsSyncPromise: Promise<number> | null = null;
+  private schemeDetailsSyncPromise: Promise<number> | null = null;
 
   constructor(mfDb: FinanciaMutualFundDatabase) {
     this.mfDb = mfDb;
@@ -139,11 +145,66 @@ export class DatasetSyncService {
     return this.lastAudit;
   }
 
+  private async fetchDatasetText(url: string, gunzip: boolean): Promise<string> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25_000);
+    try {
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Financia-Gateway/2.0',
+          Accept: 'text/csv, application/gzip, */*',
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`Upstream HTTP ${res.status} for ${url}`);
+      }
+      const rawBuf = Buffer.from(await res.arrayBuffer());
+      return gunzip ? zlib.gunzipSync(rawBuf).toString('utf8') : rawBuf.toString('utf8');
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  public async syncPortfolioHoldings(): Promise<number> {
+    if (this.holdingsSyncPromise) return this.holdingsSyncPromise;
+    this.holdingsSyncPromise = this.fetchDatasetText(MF_PORTFOLIO_HOLDINGS_URL, false)
+      .then((csv) => this.mfDb.replacePortfolioHoldingsFromCsv(csv))
+      .finally(() => {
+        this.holdingsSyncPromise = null;
+      });
+    return this.holdingsSyncPromise;
+  }
+
+  public async syncSchemeDetails(): Promise<number> {
+    if (this.schemeDetailsSyncPromise) return this.schemeDetailsSyncPromise;
+    this.schemeDetailsSyncPromise = this.fetchDatasetText(MF_SCHEME_DETAILS_URL, true)
+      .then((csv) => this.mfDb.replaceSchemeDetailsFromCsv(csv))
+      .finally(() => {
+        this.schemeDetailsSyncPromise = null;
+      });
+    return this.schemeDetailsSyncPromise;
+  }
+
+  public async ensureHoldingsReady(): Promise<void> {
+    const tasks: Array<Promise<unknown>> = [];
+    if (this.mfDb.isPortfolioHoldingsEmpty() || this.holdingsSyncPromise) {
+      tasks.push(this.syncPortfolioHoldings().catch(() => 0));
+    }
+    if (this.mfDb.isSchemeDetailsEmpty() || this.schemeDetailsSyncPromise) {
+      tasks.push(this.syncSchemeDetails().catch(() => 0));
+    }
+    if (tasks.length > 0) {
+      await Promise.all(tasks);
+    }
+  }
+
   public async warmupEmptyDatasets(): Promise<AmfiSyncAudit> {
     const start = Date.now();
     if (this.mfDb.isTerminalCatalogEmpty()) {
       this.mfDb.seedFromScreenerUniverse();
     }
+    await this.ensureHoldingsReady();
     const stats = this.mfDb.getTerminalStats();
     const audit: AmfiSyncAudit = {
       status: 'synced',

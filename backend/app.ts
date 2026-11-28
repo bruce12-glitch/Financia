@@ -156,7 +156,12 @@ export async function createBackendApp(
 
   // 1. Mount Modular Backend API Routes + Integrated SQLite 14k DB + /api/v1 + Finnhub Proxy
   app.use('/api/auth', createAuthRouter(store));
-  app.use('/api/db', createDatabaseRouter(engine.mfDb, engine.syncService, ROOT_DIR));
+  app.use(
+    '/api/db',
+    createDatabaseRouter(engine.mfDb, engine.syncService, ROOT_DIR, {
+      autoWarmupHoldings: !options.skipVite,
+    })
+  );
   app.use('/api/v1', createV1Router(engine.mfDb, navDb));
   app.use('/api/global', createGlobalExchangeRouter(engine.finnhubService));
   app.use('/api', createScreenerRouter());

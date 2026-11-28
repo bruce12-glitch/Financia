@@ -25,9 +25,11 @@ export function loadDefaultTerminalCatalogIfPresent(
 export function createDatabaseRouter(
   mfDb: FinanciaMutualFundDatabase,
   syncService: DatasetSyncService,
-  _rootDir: string
+  _rootDir: string,
+  options: { autoWarmupHoldings?: boolean } = {}
 ): Router {
   const router = Router();
+  const autoWarmupHoldings = options.autoWarmupHoldings !== false;
 
   router.get('/terminal/stats', (_req, res) => {
     res.json(mfDb.getTerminalStats());
@@ -44,6 +46,60 @@ export function createDatabaseRouter(
   router.post('/sync/amfi', async (_req, res) => {
     const audit = await syncService.syncAmfiNavAll();
     res.json({ audit, catalog: mfDb.getTerminalStats() });
+  });
+
+  router.post('/sync/holdings', async (_req, res) => {
+    try {
+      const [holdingsRows, detailsRows] = await Promise.all([
+        syncService.syncPortfolioHoldings(),
+        syncService.syncSchemeDetails().catch(() => 0),
+      ]);
+      res.json({
+        holdingsRows,
+        detailsRows,
+        filters: mfDb.getHoldingsFilters(),
+      });
+    } catch (err) {
+      res.status(502).json({
+        error: err instanceof Error ? err.message : 'Failed to synchronize portfolio holdings',
+      });
+    }
+  });
+
+  router.get('/holdings/filters', async (_req, res) => {
+    try {
+      if (autoWarmupHoldings && mfDb.isPortfolioHoldingsEmpty()) {
+        await syncService.ensureHoldingsReady();
+      }
+      res.json(mfDb.getHoldingsFilters());
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Failed to load holdings filters',
+      });
+    }
+  });
+
+  router.get('/holdings', async (req, res) => {
+    try {
+      if (autoWarmupHoldings && mfDb.isPortfolioHoldingsEmpty()) {
+        await syncService.ensureHoldingsReady();
+      }
+      const result = mfDb.queryHoldings({
+        fundCode: typeof req.query.fundCode === 'string' ? req.query.fundCode : undefined,
+        category: typeof req.query.category === 'string' ? req.query.category : undefined,
+        monthEnd: typeof req.query.monthEnd === 'string' ? req.query.monthEnd : undefined,
+        assetGroup: typeof req.query.assetGroup === 'string' ? req.query.assetGroup : undefined,
+        q: typeof req.query.q === 'string' ? req.query.q : undefined,
+        aggregated: req.query.aggregated !== 'false',
+        limit: Number(req.query.limit) || 60,
+        offset: Number(req.query.offset) || 0,
+      });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Failed to query portfolio holdings',
+      });
+    }
   });
 
   return router;
